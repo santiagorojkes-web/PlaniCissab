@@ -1,1 +1,2480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Planificación Cissab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#fff8f4;
+  --surface:#ffffff;
+  --border:#fcd9c0;
+  --border-strong:#f4a96a;
+  --text:#1a1917;
+  --text-muted:#7a5c44;
+  --text-faint:#c4a68a;
+  --accent:#e8630a;
+  --accent-dark:#c2500a;
+  --accent-light:#fff3eb;
+  --accent-mid:#f4a96a;
+  --recibimiento:#dbeafe; --recibimiento-t:#1e3a5f;
+  --traslado:#f1f0ed;    --traslado-t:#3d3b37;
+  --juego:#dcfce7;       --juego-t:#14532d;
+  --merienda:#fef3c7;    --merienda-t:#78350f;
+  --cierre:#fce7f3;      --cierre-t:#831843;
+  --drag-bg:#fdeadb;
+  --shadow:0 1px 3px rgba(232,99,10,.08),0 1px 2px rgba(232,99,10,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem 1rem 4rem;}
+.page{max-width:1300px;margin:0 auto;}
 
+.page-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:1.5rem;
+  padding:16px 20px;
+  background:var(--accent);
+  border-radius:14px;
+  box-shadow:0 4px 16px rgba(232,99,10,.25);
+}
+.page-header-logo{height:42px;width:auto;display:block;}
+.page-header-title{
+  font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.85);text-align:right;
+}
+.page-header-title strong{display:block;font-size:20px;color:#fff;letter-spacing:.04em;}
+.page-header-tag{font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;font-style:italic;}
+
+.info-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px;box-shadow:var(--shadow);border-top:3px solid var(--accent);}
+.info-grid{display:grid;grid-template-columns:1fr 160px 1fr 1fr;border-bottom:1px solid var(--border);}
+.info-cell{padding:12px 16px;border-right:1px solid var(--border);}
+.info-cell:last-child{border-right:none;}
+.info-cell.full{grid-column:span 4;border-right:none;border-bottom:1px solid var(--border);}
+.info-cell.full:last-child{border-bottom:none;}
+.field-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:4px;}
+.field-input{width:100%;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;}
+.field-input::placeholder{color:var(--text-faint);}
+select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
+
+.hilo-cell{padding:11px 16px;display:flex;align-items:center;gap:10px;background:var(--accent-light);border-top:1px solid var(--border);}
+.hilo-dot{width:3px;height:32px;background:var(--accent);border-radius:2px;flex-shrink:0;}
+.hilo-inner{flex:1;}
+.hilo-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px;}
+.hilo-input{width:100%;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--accent);outline:none;}
+.hilo-input::placeholder{color:var(--accent-mid);}
+
+.team-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:var(--shadow);}
+.team-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);white-space:nowrap;}
+.team-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.team-chip{display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--border-strong);border-radius:20px;padding:4px 10px 4px 12px;font-size:12px;font-weight:500;color:var(--text);}
+.chip-del{background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:14px;line-height:1;padding:0;transition:color .15s;}
+.chip-del:hover{color:#dc2626;}
+.team-add{display:flex;align-items:center;gap:6px;}
+.team-input{border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;width:140px;transition:border-color .15s;}
+.team-input:focus{border-color:var(--accent);}
+.team-input::placeholder{color:var(--text-faint);}
+.team-add-btn{background:var(--accent);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s;}
+.team-add-btn:hover{background:var(--accent-dark);}
+
+/* table wrapper: overflow visible so dropdown not clipped */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:visible;}
+.table-inner{border-radius:12px;overflow:hidden;}
+
+.col-grid{display:grid;grid-template-columns:36px 130px 120px 1fr 90px 145px 100px 125px 130px 44px;}
+.col-headers{background:var(--bg);border-bottom:1px solid var(--border);}
+.col-h{padding:8px 12px;font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);border-right:1px solid var(--border);}
+.col-h:last-child{border-right:none;}
+
+.momento{border-bottom:1px solid var(--border);min-height:60px;}
+.momento:last-child{border-bottom:none;}
+.momento.dragging{opacity:.4;}
+.momento.drag-over{background:var(--drag-bg);box-shadow:inset 0 2px 0 var(--accent);}
+
+.mcell{padding:10px 12px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:4px;min-width:0;overflow:visible;word-break:break-word;word-wrap:break-word;}
+.mcell:last-child{border-right:none;}
+
+.drag-handle{cursor:grab;display:flex;align-items:center;justify-content:center;user-select:none;padding:0;}
+.drag-handle:active{cursor:grabbing;}
+.drag-dots{display:grid;grid-template-columns:1fr 1fr;gap:2.5px;width:10px;}
+.drag-dots span{width:2.5px;height:2.5px;background:var(--text-faint);border-radius:50%;}
+
+/* dual time */
+.time-pair{display:flex;flex-direction:column;gap:5px;}
+.time-row{display:flex;align-items:center;gap:5px;}
+.time-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);width:16px;flex-shrink:0;}
+.time-input{flex:1;min-width:0;border:none;background:var(--bg);border-radius:5px;font-family:'DM Mono',monospace;font-size:12px;color:var(--text);outline:none;padding:3px 6px;}
+.time-input::placeholder{color:var(--text-faint);}
+
+/* tipo badge */
+.tipo-wrap{position:relative;display:inline-block;}
+.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:opacity .15s;}
+.tipo-badge:hover{opacity:.8;}
+.arrow{font-size:9px;}
+.tipo-Recibimiento{background:var(--recibimiento);color:var(--recibimiento-t);}
+.tipo-Traslado    {background:var(--traslado);    color:var(--traslado-t);}
+.tipo-Juego       {background:var(--juego);       color:var(--juego-t);}
+.tipo-Merienda    {background:var(--merienda);    color:var(--merienda-t);}
+.tipo-Cierre      {background:var(--cierre);      color:var(--cierre-t);}
+
+/* dropdown uses fixed positioning so it's never clipped */
+.tipo-dropdown{
+  display:none;position:fixed;z-index:9999;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:8px;padding:4px;min-width:130px;
+  box-shadow:0 4px 16px rgba(0,0,0,.14);
+}
+.tipo-dropdown.open{display:block;}
+.tipo-opt{display:block;width:100%;padding:7px 10px;text-align:left;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;border-radius:5px;color:var(--text);transition:background .1s;}
+.tipo-opt:hover{background:var(--bg);}
+
+.cell-input{width:100%;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);outline:none;resize:none;line-height:1.5;flex:1;overflow:hidden;word-break:break-word;word-wrap:break-word;white-space:pre-wrap;}
+.cell-input::placeholder{color:var(--text-faint);}
+
+.items-list{display:flex;flex-direction:column;gap:5px;}
+.item-row{display:flex;flex-direction:column;gap:3px;}
+.item-top{display:flex;align-items:flex-start;gap:4px;}
+.item-text{font-size:12px;color:var(--text);flex:1;min-width:0;word-break:break-word;word-wrap:break-word;white-space:normal;line-height:1.3;}
+.item-del{background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:13px;padding:0;line-height:1;flex-shrink:0;transition:color .12s;margin-top:1px;}
+.item-del:hover{color:#dc2626;}
+.assign-chips{display:flex;gap:3px;flex-wrap:wrap;}
+.assign-chip{font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text-muted);cursor:pointer;transition:all .12s;white-space:nowrap;}
+.assign-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
+.adding-row{display:flex;align-items:center;gap:4px;margin-top:2px;}
+.adding-input{flex:1;border:none;border-bottom:1px solid var(--border-strong);background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);outline:none;padding:1px 0;min-width:0;word-break:break-word;}
+.adding-input::placeholder{color:var(--text-faint);}
+.confirm-btn{background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;font-weight:600;padding:0 2px;line-height:1;flex-shrink:0;}
+.add-item-btn{display:inline-flex;align-items:center;gap:3px;background:none;border:none;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-faint);cursor:pointer;padding:0;transition:color .12s;margin-top:2px;}
+.add-item-btn:hover{color:var(--accent);}
+.int-trigger{display:inline-flex;align-items:center;gap:4px;background:none;border:1px dashed var(--border-strong);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-faint);cursor:pointer;padding:4px 9px;transition:all .12s;align-self:flex-start;}
+.int-trigger:hover{border-color:var(--accent);color:var(--accent);}
+.del-row-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:16px;padding:0;transition:color .12s;display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
+.del-row-btn:hover{color:#dc2626;}
+
+.add-momento-row{display:flex;align-items:center;justify-content:center;padding:12px;border-top:1px solid var(--border);}
+.add-momento-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--border-strong);border-radius:8px;padding:7px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all .15s;}
+.add-momento-btn:hover{background:var(--bg);border-color:var(--accent);color:var(--accent);}
+
+.bottom-bar{display:flex;gap:10px;margin-top:16px;align-items:center;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);transition:all .15s;}
+.btn:hover{background:var(--bg);}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
+.btn.primary:hover{background:var(--accent-dark);border-color:var(--accent-dark);}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1917;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:9000;transition:transform .25s ease;pointer-events:none;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* ── PRINT ── */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { background: #fff !important; padding: 0 !important; font-size: 11px !important; }
+  .page { max-width: 100% !important; }
+
+  .bottom-bar, .add-momento-row, .add-item-btn, .int-trigger,
+  .chip-del, .del-row-btn, .team-add, .item-del, .confirm-btn,
+  .adding-row, .tipo-dropdown, .arrow, .drag-handle { display: none !important; }
+
+  .col-headers .col-h:first-child,
+  .col-headers .col-h:last-child,
+  .momento .mcell:first-child,
+  .momento .mcell:last-child { display: none !important; }
+
+  .assign-chip:not(.on) { display: none !important; }
+  .assign-chip.on { background: #e8630a !important; color: #fff !important; border-color: #e8630a !important; font-size: 9px !important; padding: 1px 5px !important; }
+
+  .info-card, .team-card, .table-wrap { box-shadow: none !important; border-radius: 6px !important; }
+  .table-inner { border-radius: 6px !important; overflow: visible !important; }
+  .table-wrap { overflow: visible !important; }
+
+  .hilo-cell { background: #fff3eb !important; }
+  .hilo-dot  { background: #e8630a !important; }
+
+  .col-grid {
+    grid-template-columns:
+      0
+      65px
+      90px
+      1fr
+      55px
+      105px
+      80px
+      100px
+      108px
+      0
+    !important;
+  }
+
+  .tipo-Recibimiento { background: #dbeafe !important; color: #1e3a5f !important; }
+  .tipo-Traslado     { background: #f1f0ed !important; color: #3d3b37 !important; }
+  .tipo-Juego        { background: #dcfce7 !important; color: #14532d !important; }
+  .tipo-Merienda     { background: #fef3c7 !important; color: #78350f !important; }
+  .tipo-Cierre       { background: #fce7f3 !important; color: #831843 !important; }
+
+  .momento { break-inside: avoid; }
+
+  .mcell { padding: 5px 7px !important; overflow: visible !important; word-break: break-word !important; }
+
+  .time-input { background: transparent !important; font-size: 10px !important; padding: 1px 2px !important; color: #1a1917 !important; width: auto !important; }
+  .time-lbl { color: #7a7670 !important; font-size: 8px !important; }
+  .time-pair { gap: 3px !important; }
+  .time-row  { gap: 3px !important; }
+
+  .cell-input { font-size: 11px !important; color: #1a1917 !important; overflow: visible !important; }
+  .item-text  { font-size: 11px !important; }
+
+  .info-cell, .hilo-cell { padding: 6px 12px !important; }
+  .team-card { padding: 6px 12px !important; margin-bottom: 6px !important; }
+  .info-card { margin-bottom: 6px !important; }
+  .col-h     { padding: 6px 7px !important; font-size: 9px !important; }
+}
+
+/* ── STARTUP MODAL ── */
+#startModal {
+  position:fixed;inset:0;z-index:99999;
+  background:rgba(26,25,23,.6);
+  backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Sans',sans-serif;
+}
+.modal-box {
+  background:#fff;border-radius:20px;
+  box-shadow:0 24px 64px rgba(232,99,10,.18);
+  overflow:hidden;width:520px;max-width:95vw;
+}
+.modal-header {
+  background:var(--accent);
+  padding:24px 28px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-logo { height:40px;width:auto; }
+.modal-tagline { font-size:11px;color:rgba(255,255,255,.75);font-style:italic;text-align:right; }
+.modal-body { padding:28px; }
+.modal-title {
+  font-size:18px;font-weight:600;color:var(--text);margin-bottom:6px;
+}
+.modal-sub { font-size:13px;color:var(--text-muted);margin-bottom:22px; }
+.modal-cards { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px; }
+.modal-card {
+  border:1.5px solid var(--border);border-radius:12px;padding:16px;
+  cursor:pointer;transition:all .18s;text-align:left;background:#fff;
+  font-family:'DM Sans',sans-serif;
+}
+.modal-card:hover { border-color:var(--accent);background:var(--accent-light); }
+.modal-card-icon { font-size:26px;margin-bottom:8px;display:block; }
+.modal-card-title { font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px; }
+.modal-card-desc { font-size:11px;color:var(--text-muted);line-height:1.4; }
+.modal-card.disabled { opacity:.45;cursor:default;pointer-events:none; }
+.modal-divider { text-align:center;font-size:11px;color:var(--text-faint);margin:4px 0 16px; }
+.modal-import-btn {
+  width:100%;border:1.5px dashed var(--border-strong);border-radius:10px;
+  background:transparent;padding:14px;font-family:'DM Sans',sans-serif;
+  font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .18s;
+}
+.modal-import-btn:hover { border-color:var(--accent);color:var(--accent);background:var(--accent-light); }
+.modal-saved-badge {
+  display:inline-flex;align-items:center;gap:5px;
+  background:#dcfce7;color:#14532d;border-radius:20px;
+  font-size:10px;font-weight:600;padding:2px 8px;margin-bottom:14px;
+}
+
+/* PDF import overlay */
+#importOverlay {
+  position:fixed;inset:0;z-index:100000;
+  background:rgba(26,25,23,.7);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;
+  font-family:'DM Sans',sans-serif;
+}
+#importOverlay.show { display:flex; }
+.import-box {
+  background:#fff;border-radius:16px;width:460px;max-width:95vw;
+  box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;
+}
+.import-header {
+  background:var(--accent);padding:18px 22px;
+  font-size:14px;font-weight:700;color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.import-close { background:none;border:none;color:rgba(255,255,255,.8);font-size:20px;cursor:pointer;line-height:1; }
+.import-body { padding:22px; }
+.import-drop {
+  border:2px dashed var(--border-strong);border-radius:10px;padding:32px;
+  text-align:center;cursor:pointer;transition:all .18s;
+  background:var(--bg);position:relative;
+}
+.import-drop:hover, .import-drop.dragover { border-color:var(--accent);background:var(--accent-light); }
+.import-drop input[type=file] { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+.import-drop-icon { font-size:36px;margin-bottom:10px; }
+.import-drop-text { font-size:13px;font-weight:500;color:var(--text-muted); }
+.import-drop-sub { font-size:11px;color:var(--text-faint);margin-top:4px; }
+.import-status {
+  margin-top:14px;padding:12px 14px;border-radius:8px;font-size:12px;
+  display:none;
+}
+.import-status.loading { background:#fff3eb;color:var(--accent);display:flex;align-items:center;gap:8px; }
+.import-status.error   { background:#fee2e2;color:#991b1b;display:block; }
+.import-status.success { background:#dcfce7;color:#14532d;display:flex;align-items:center;gap:8px; }
+.spinner {
+  width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;
+  border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+
+.m-mobile-header { display: none; }
+
+/* ══════════════════════════════
+   MOBILE
+══════════════════════════════ */
+@media (max-width: 768px) {
+  body { padding: 1rem 0 5rem; }
+  .page { padding: 0; }
+
+  /* Header */
+  .page-header { border-radius: 0; margin-bottom: 0; padding: 14px 16px; }
+  .page-header-logo { height: 32px; }
+  .page-header-title strong { font-size: 15px; }
+
+  /* Info card */
+  .info-card { border-radius: 0; border-left: none; border-right: none; margin-bottom: 0; border-top: 3px solid var(--accent); }
+  .info-grid { grid-template-columns: 1fr 1fr; }
+  .info-cell.full { grid-column: span 2; }
+  .field-input { font-size: 15px; }
+  .hilo-cell { border-radius: 0; }
+
+  /* Team */
+  .team-card { border-radius: 0; border-left: none; border-right: none; margin-bottom: 0; border-top: 1px solid var(--border); flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 16px; }
+  .team-chips { gap: 6px; }
+  .team-add { width: 100%; }
+  .team-input { flex: 1; width: auto; }
+
+  /* Table wrapper → no border on mobile */
+  .table-wrap { border: none; border-radius: 0; box-shadow: none; background: var(--bg); }
+  .table-inner { border-radius: 0; overflow: visible; }
+
+  /* Hide column headers */
+  .col-headers { display: none !important; }
+
+  /* Each momento → card */
+  .m-mobile-header { display: flex !important; }
+
+  .momento.col-grid {
+    display: flex !important;
+    flex-direction: column;
+    margin: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  /* Mobile momento header: tipo + horario + delete in one row */
+  .m-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+  .m-mobile-time {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .m-mobile-time-sep { color: var(--text-faint); }
+
+  /* Hide desktop-only cells on mobile */
+  .mcell.is-drag, .mcell.is-horario, .mcell.is-tipo, .mcell.is-delete { display: none !important; }
+
+  /* Mobile cells: full width, labeled */
+  .mcell.is-desc, .mcell.is-lugar, .mcell.is-mat,
+  .mcell.is-int, .mcell.is-rol, .mcell.is-din {
+    display: block !important;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    overflow: visible;
+    min-width: 0;
+  }
+  .mcell:last-of-type { border-bottom: none; }
+
+  .mcell-lbl-mobile {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--text-faint);
+    margin-bottom: 5px;
+  }
+
+  .cell-input { font-size: 15px; }
+  .time-input { font-size: 14px; }
+
+  /* Add momento btn */
+  .add-momento-row { padding: 14px 12px; border-top: none; }
+  .add-momento-btn { width: 100%; justify-content: center; padding: 12px; font-size: 14px; border-radius: 12px; }
+
+  /* Bottom bar */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 8px 10px 16px;
+    margin: 0;
+    gap: 6px;
+    z-index: 100;
+    flex-wrap: wrap;
+    justify-content: stretch;
+  }
+  .bottom-bar .btn { flex: 1 1 calc(50% - 6px); justify-content: center; padding: 12px 6px; font-size: 12px; border-radius: 10px; gap: 4px; }
+  .bottom-bar .btn.primary { flex: 1 1 calc(50% - 6px); }
+
+  .btn.primary { flex: 1.5; }
+
+  /* Modal */
+  .modal-box { border-radius: 16px; width: calc(100% - 32px); max-width: 420px; overflow-y: auto; max-height: 88vh; }
+    .modal-header { padding: 18px 20px 16px; }
+  .modal-body { padding: 20px; }
+  .modal-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-card { padding: 14px; }
+  .modal-card-icon { font-size: 22px; margin-bottom: 6px; }
+  .modal-card-title { font-size: 13px; }
+  .modal-card-desc { font-size: 10px; }
+
+  /* Import overlay */
+  .import-box { border-radius: 16px 16px 0 0; position: fixed; bottom: 0; left: 0; right: 0; width: 100%; max-width: 100%; }
+  #importOverlay { align-items: flex-end; }
+  .import-drop { padding: 24px 16px; }
+
+  /* Assign chips bigger on mobile */
+  .assign-chip { font-size: 12px; padding: 4px 12px; }
+  .add-item-btn { font-size: 13px; padding: 4px 0; }
+  .int-trigger { font-size: 13px; padding: 8px 12px; }
+  .item-text { font-size: 13px; }
+
+  /* Toast above bottom bar */
+  .toast { bottom: 72px; }
+}
+
+
+/* ── MIC BUTTON ── */
+.mic-wrap { position: relative; }
+.mic-btn {
+  background: var(--accent-light); border: none; cursor: pointer;
+  color: var(--accent); padding: 5px 6px;
+  line-height: 1; border-radius: 8px; transition: all .15s;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+.mic-btn:hover { background: var(--accent); color: #fff; }
+.mic-btn.listening {
+  color: #fff; background: #e8360a;
+  animation: mic-pulse .8s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232,54,10,.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(232,54,10,0); }
+}
+.textarea-wrap {
+  display: flex; align-items: flex-start; gap: 4px; width: 100%; flex: 1;
+}
+.textarea-wrap .cell-input { flex: 1; width: 100%; }
+
+
+.drive-btn { background: #fff; color: #1a1917; border: 1px solid #dadce0; font-weight:500; }
+.drive-btn:hover { background: #f8f9fa; border-color: #bdc1c6; }
+.drive-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+
+/* ── LOGIN ── */
+#loginOverlay{position:fixed;inset:0;z-index:200000;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;}
+.login-box{background:#fff;border-radius:20px;padding:36px 32px;width:380px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.2);}
+.login-logo{text-align:center;margin-bottom:24px;}
+.login-logo img{height:48px;}
+.login-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;text-align:center;}
+.login-sub{font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:24px;}
+.login-field{margin-bottom:14px;}
+.login-field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin-bottom:5px;}
+.login-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;background:var(--bg);transition:border-color .15s;}
+.login-input:focus{border-color:var(--accent);}
+.login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;margin-top:8px;transition:background .15s;}
+.login-btn:hover{background:var(--accent-dark);}
+.login-error{color:#dc2626;font-size:12px;margin-top:8px;text-align:center;min-height:16px;}
+.login-remember{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);margin-top:10px;cursor:pointer;}
+
+/* ── GRUPO MULTI-SELECT ── */
+.grupo-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.grupo-chip-btn{border:1.5px solid var(--border-strong);background:var(--bg);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.grupo-chip-btn:hover{border-color:var(--accent);color:var(--accent);}
+.grupo-chip-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.grupo-chip-btn.general{border-style:dashed;}
+
+/* ── TIPO ACTIVIDAD ── */
+.tipo-act-select{width:100%;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;}
+.jag-wrap{display:none;margin-top:6px;}
+.jag-wrap.visible{display:block;}
+.jag-input{width:100%;border:none;border-bottom:1px solid var(--accent);background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--accent);outline:none;padding:2px 0;}
+.jag-input::placeholder{color:var(--accent-mid);}
+
+/* ── MOMENTO PERSONALIZADO ── */
+.tipo-Personalizado{background:#f3e8ff;color:#6b21a8;}
+.custom-tipo-input{border:none;background:transparent;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;color:#6b21a8;outline:none;width:90px;min-width:50px;}
+.custom-tipo-input::placeholder{color:#c084fc;}
+
+/* ── DRIVE FOLDER MODAL ── */
+#driveFolderModal{position:fixed;inset:0;z-index:150000;background:rgba(26,25,23,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;padding:12px;}
+#driveFolderModal.open{display:flex;}
+.dfm-box{background:#fff;border-radius:16px;width:100%;max-width:460px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.15);}
+.dfm-header{background:var(--accent);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;color:#fff;}
+.dfm-title{font-size:15px;font-weight:700;}
+.dfm-close{background:none;border:none;color:rgba(255,255,255,.8);font-size:20px;cursor:pointer;line-height:1;}
+.dfm-body{padding:20px;max-height:60vh;overflow-y:auto;}
+.dfm-section{margin-bottom:16px;}
+.dfm-section-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin-bottom:8px;}
+.dfm-folder-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s;}
+.dfm-folder-item:hover{background:var(--bg);}
+.dfm-folder-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+.dfm-folder-name{font-size:13px;color:var(--text);}
+.dfm-folder-icon{font-size:16px;}
+.dfm-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+
+/* ── ADMIN BADGE ── */
+.admin-badge{display:inline-flex;align-items:center;gap:4px;background:#fef3c7;color:#92400e;border-radius:20px;font-size:10px;font-weight:700;padding:2px 8px;margin-left:6px;}
+
+@media(max-width:768px){
+  .grupo-chips{gap:5px;}
+  .grupo-chip-btn{padding:6px 12px;font-size:12px;}
+}
+
+
+/* ── TIPO ACTIVIDAD CHIPS ── */
+.tipo-act-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.tipo-act-chip {
+  border:1.5px solid var(--border-strong); background:var(--bg);
+  border-radius:20px; padding:5px 14px; font-size:13px; font-weight:500;
+  font-family:'DM Sans',sans-serif; cursor:pointer; transition:all .15s; white-space:nowrap;
+  color:var(--text-muted);
+}
+.tipo-act-chip:hover { opacity:.85; }
+.tipo-act-chip.active { color:#fff; border-color:transparent; }
+.tipo-act-chip[data-tipo="Actividad Chill"].active        { background:#3b82f6; }
+.tipo-act-chip[data-tipo="Actividad Deportiva"].active    { background:#22c55e; }
+.tipo-act-chip[data-tipo="Actividad General"].active      { background:var(--accent); }
+.tipo-act-chip[data-tipo="Actividad Jaguim"].active       { background:#8b5cf6; }
+.tipo-act-chip[data-tipo="Actividad Picante"].active      { background:#ef4444; }
+.tipo-act-chip[data-tipo="Actividad de Terror"].active    { background:#1f2937; }
+
+</style>
+</head>
+<body>
+
+<!-- Startup modal -->
+
+<!-- Login -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="https://cissab.org.ar/wp-content/uploads/2020/05/LOGO-CISSAB-BLANCO-FONDO-TRANSPARENTE-1-1.png" alt="Cissab" onerror="this.style.display='none'" style="filter:invert(1) sepia(1) saturate(5) hue-rotate(340deg);"/>
+    </div>
+    <div class="login-title">Bienvenido a PlanniCissab</div>
+    <div class="login-sub">Ingresá con el mail de tu grupo</div>
+    <div class="login-field">
+      <label>Mail</label>
+      <input class="login-input" type="email" id="loginEmail" placeholder="mail@grupo.com" autocomplete="email"/>
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input class="login-input" type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <label class="login-remember">
+      <input type="checkbox" id="loginRemember" checked/> Recordarme en este dispositivo
+    </label>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- Drive Folder Selector -->
+<div id="driveFolderModal">
+  <div class="dfm-box">
+    <div class="dfm-header">
+      <span class="dfm-title">📁 ¿A dónde subir la planificación?</span>
+      <button class="dfm-close" onclick="cerrarDriveFolderModal()">×</button>
+    </div>
+    <div class="dfm-body" id="dfmBody">
+      <!-- populated by JS -->
+    </div>
+    <div class="dfm-footer">
+      <button class="btn" onclick="cerrarDriveFolderModal()">Cancelar</button>
+      <button class="btn drive-btn" id="dfmConfirmBtn" onclick="confirmarSubidaDrive()" style="display:flex;align-items:center;gap:7px;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="16" height="14" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+        Subir a seleccionadas
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="startModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <img class="modal-logo" src="https://cissab.org.ar/wp-content/uploads/2020/05/LOGO-CISSAB-BLANCO-FONDO-TRANSPARENTE-1-1.png" alt="Cissab" onerror="this.style.display='none'"/>
+      <div class="modal-tagline">#MiCorazónLateNaranja</div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-title">Hoja de planificación</div>
+      <div class="modal-sub">¿Qué querés hacer hoy?</div>
+      <div id="savedBadge" class="modal-saved-badge" style="display:none;">
+        ✓ Hay una planificación guardada
+      </div>
+      <div class="modal-cards">
+        <button class="modal-card disabled" id="btnContinuar" onclick="continuarPlanificacion()">
+          <span class="modal-card-icon">📋</span>
+          <div class="modal-card-title">Continuar</div>
+          <div class="modal-card-desc">Seguir con la planificación guardada en este dispositivo.</div>
+        </button>
+        <button class="modal-card" onclick="nuevaPlanificacion()">
+          <span class="modal-card-icon">✨</span>
+          <div class="modal-card-title">Nueva planificación</div>
+          <div class="modal-card-desc">Empezar de cero con la hoja en blanco.</div>
+        </button>
+        <button class="modal-card" id="btnSyncDrive" onclick="sincronizarDesdeDrive()" style="grid-column:span 2;display:flex;align-items:center;gap:12px;text-align:left;">
+          <span class="modal-card-icon">☁️</span>
+          <div><div class="modal-card-title">Cargar desde Drive</div>
+          <div class="modal-card-desc">Traer la última planificación guardada por el grupo en Drive.</div></div>
+        </button>
+      </div>
+      <div class="modal-divider">— o —</div>
+      <button class="modal-import-btn" onclick="abrirImportModal()">
+        📄 Importar desde PDF
+        <span style="font-size:10px;font-weight:400;color:var(--text-faint);">Cargá una planificación existente y editála</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF Import overlay -->
+<div id="importOverlay">
+  <div class="import-box">
+    <div class="import-header">
+      📄 Importar planificación desde PDF
+      <button class="import-close" onclick="cerrarImportModal()">×</button>
+    </div>
+    <div class="import-body">
+      <div class="import-drop" id="importDrop">
+        <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdfFile(this.files[0])"/>
+        <div class="import-drop-icon">📎</div>
+        <div class="import-drop-text">Arrastrá el PDF o hacé click para seleccionarlo</div>
+        <div class="import-drop-sub">Solo archivos .pdf · Planificaciones generadas con esta herramienta</div>
+      </div>
+      <div class="import-status" id="importStatus"></div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="mainPage" style="display:none;">
+
+<div class="page-header">
+  <img class="page-header-logo" src="https://cissab.org.ar/wp-content/uploads/2020/05/LOGO-CISSAB-BLANCO-FONDO-TRANSPARENTE-1-1.png" alt="Cissab" onerror="this.style.display='none'"/>
+  <div class="page-header-title">
+    <strong>Hoja de Planificación</strong>
+    <div class="page-header-tag">#MiCorazónLateNaranja</div>
+  </div>
+</div>
+
+<div class="info-card">
+  <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;">
+    <div class="info-cell" style="grid-column:span 3;border-right:none;border-bottom:1px solid var(--border);">
+      <div class="field-label">Grupo</div>
+      <div class="grupo-chips" id="grupoChips"></div>
+    </div>
+    <div class="info-cell">
+      <div class="field-label">Fecha</div>
+      <input class="field-input" type="date" id="fecha"/>
+    </div>
+    <div class="info-cell">
+      <div class="field-label">Tema</div>
+      <input class="field-input" type="text" id="tema" placeholder="¿De qué trata hoy?"/>
+    </div>
+    <div class="info-cell" style="border-right:none;">
+      <div class="field-label">Contenido</div>
+      <input class="field-input" type="text" id="contenido" placeholder="¿Qué queremos transmitir?"/>
+    </div>
+    <div class="info-cell" style="grid-column:span 3;border-right:none;">
+      <div class="field-label">Tipo de actividad</div>
+      <div class="tipo-act-chips" id="tipoActChips"></div>
+      <div class="jag-wrap" id="jagWrap">
+        <input class="jag-input" type="text" id="jagText" placeholder="Insertar Jag..." oninput="saveAll()"/>
+      </div>
+    </div>
+  </div>
+  <div class="info-cell full">
+    <div class="field-label">Objetivo</div>
+    <input class="field-input" type="text" id="objetivo" placeholder="¿Qué queremos que se lleven los janijim?"/>
+  </div>
+  <div class="hilo-cell">
+    <div class="hilo-dot"></div>
+    <div class="hilo-inner">
+      <div class="hilo-label">Hilo conductor</div>
+      <input class="hilo-input" type="text" id="hilo" placeholder="La idea que une todos los momentos de la actividad..."/>
+    </div>
+  </div>
+</div>
+
+<div class="team-card">
+  <span class="team-label">Equipo</span>
+  <div class="team-chips" id="teamChips"></div>
+  <div class="team-add">
+    <input class="team-input" type="text" id="teamInput" placeholder="Agregar madrij..."
+      onkeydown="if(event.key==='Enter')addMadrij()"/>
+    <button class="team-add-btn" onclick="addMadrij()">+ Agregar</button>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="table-inner">
+    <div class="col-grid col-headers">
+      <div class="col-h"></div>
+      <div class="col-h">Horario</div>
+      <div class="col-h">Momento</div>
+      <div class="col-h">Desarrollo de la actividad</div>
+      <div class="col-h">Lugar</div>
+      <div class="col-h">Materiales</div>
+      <div class="col-h">Intendencia</div>
+      <div class="col-h">Roles</div>
+      <div class="col-h">Dinámica e intervenciones</div>
+      <div class="col-h"></div>
+    </div>
+    <div id="momentosBody"></div>
+  </div>
+  <div class="add-momento-row">
+    <button class="add-momento-btn" onclick="addMomento()">+ Agregar momento</button>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn" onclick="showModal()" title="Volver al inicio" style="border-color:var(--border-strong);color:var(--text-muted);">&#8592; Inicio</button>
+  <button class="btn" onclick="logout()" title="Cerrar sesión" style="color:var(--text-faint);font-size:11px;">⏏ Salir</button>
+  <button class="btn" onclick="abrirImportModal()" title="Importar una planificación desde PDF">&#128196; Importar PDF</button>
+  <button class="btn" onclick="descargarPdf()" id="btnPdf">&#128438; Guardar PDF</button>
+  <button class="btn drive-btn" onclick="subirADrive()" id="btnDrive" style="display:flex;align-items:center;gap:7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="18" height="16" aria-hidden="true" style="flex-shrink:0;display:inline-block;vertical-align:middle;">
+  <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+  <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+  <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+  <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+  <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+  <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+</svg> Subir Planificación</button>
+  <button class="btn primary" onclick="guardar()">&#10003; Guardar</button>
+  <button class="btn" onclick="nuevaPlanificacion()" style="border-color:var(--accent);color:var(--accent);">&#10011; Nueva</button>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+// ══════════════════════════════════════════════════════
+// USERS & LOGIN
+// ══════════════════════════════════════════════════════
+const USERS = [
+  { email:'cissabmeretz@gmail.com',   pw:'meretz',   grupo:'Meretz',   isAdmin:false },
+  { email:'leshatef.cissab@gmail.com',pw:'leshatef', grupo:'Leshatef', isAdmin:false },
+  { email:'letamid26@gmail.com',      pw:'letamid',  grupo:'Letamid',  isAdmin:false },
+  { email:'mejudashcissab@gmail.com', pw:'mejudash', grupo:'Mejudash', isAdmin:false },
+  { email:'nitzajoncissab@gmail.com', pw:'nitzajon', grupo:'Nitzajon', isAdmin:false },
+  { email:'teshukacissab@gmail.com',  pw:'teshuka',  grupo:'Teshuka',  isAdmin:false },
+  { email:'moadon@cissab.org.ar',     pw:'moadon',   grupo:null,       isAdmin:true  },
+  { email:'santiagorojkes@gmail.com', pw:'santi',    grupo:null,       isAdmin:true  },
+];
+let currentUser = null;
+
+
+function logout() {
+  localStorage.removeItem('cissab_session');
+  currentUser = null;
+  gAccessToken = null;
+  gTokenClient = null;
+  document.getElementById('mainPage').style.display='none';
+  document.getElementById('startModal').style.display='none';
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').textContent='';
+}
+function doLogin() {
+  const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
+  const pw    = (document.getElementById('loginPass').value||'').trim();
+  const err   = document.getElementById('loginError');
+  const user  = USERS.find(u => u.email.toLowerCase()===email && u.pw===pw);
+  if (!user) { err.textContent='Mail o contraseña incorrectos.'; return; }
+  err.textContent='';
+  currentUser = user;
+  if (document.getElementById('loginRemember').checked)
+    localStorage.setItem('cissab_session', JSON.stringify({email:user.email,pw:user.pw}));
+  afterLogin();
+}
+
+function tryAutoLogin() {
+  try {
+    const saved = localStorage.getItem('cissab_session');
+    if (!saved) return false;
+    const {email,pw} = JSON.parse(saved);
+    const user = USERS.find(u=>u.email.toLowerCase()===email.toLowerCase()&&u.pw===pw);
+    if (!user) { localStorage.removeItem('cissab_session'); return false; }
+    currentUser = user;
+    return true;
+  } catch(e) { return false; }
+}
+
+function afterLogin() {
+  document.getElementById('loginOverlay').style.display='none';
+  if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
+    selectedGrupos=[currentUser.grupo];
+    renderGrupoChips();
+    updateMadrijimFromGrupos();
+  }
+  showModal();
+}
+
+// ══════════════════════════════════════════════════════
+// MULTI-GROUP
+// ══════════════════════════════════════════════════════
+const ALL_GRUPOS=['Letamid','Leshatef','Meretz','Teshuka','Mejudash','Nitzajon'];
+let selectedGrupos=[];
+
+function renderGrupoChips() {
+  const c=document.getElementById('grupoChips'); if(!c)return;
+  c.innerHTML=[...ALL_GRUPOS,'General'].map(g=>{
+    const active=g==='General'?selectedGrupos[0]==='General':selectedGrupos.includes(g);
+    return `<button class="grupo-chip-btn${active?' active':''}${g==='General'?' general':''}" onclick="toggleGrupo('${g}')">${g}</button>`;
+  }).join('');
+}
+
+function toggleGrupo(g) {
+  if(g==='General'){
+    selectedGrupos=selectedGrupos[0]==='General'?[]:['General'];
+    if(selectedGrupos[0]==='General'){
+      const ta=document.getElementById('tipoActividad');
+      if(ta){ta.value='Actividad General';onTipoActChange();}
+    }
+  } else {
+    selectedGrupos=selectedGrupos.filter(x=>x!=='General');
+    selectedGrupos.includes(g)?selectedGrupos=selectedGrupos.filter(x=>x!==g):selectedGrupos.push(g);
+  }
+  renderGrupoChips(); updateMadrijimFromGrupos(); saveAll();
+}
+
+function updateMadrijimFromGrupos() {
+  if(selectedGrupos[0]==='General'){
+    const all=[];
+    ALL_GRUPOS.forEach(g=>(GRUPO_MADRIJIM[g]||[]).forEach(m=>{if(!all.includes(m))all.push(m);}));
+    madrijim=all;
+  } else if(selectedGrupos.length>0){
+    const m=[];
+    selectedGrupos.forEach(g=>(GRUPO_MADRIJIM[g]||[]).forEach(n=>{if(!m.includes(n))m.push(n);}));
+    madrijim=m;
+  } else { madrijim=[]; }
+  renderTeam(); renderAll();
+}
+
+function getGrupoNombre(){
+  if(!selectedGrupos.length)return'';
+  if(selectedGrupos[0]==='General')return'General';
+  return selectedGrupos.join('+');
+}
+
+// ══════════════════════════════════════════════════════
+// TIPO ACTIVIDAD
+// ══════════════════════════════════════════════════════
+
+
+// ══════════════════════════════════════════════════════
+// FILE NAMING
+// ══════════════════════════════════════════════════════
+function getNombreArchivo(){
+  const fecha=(document.getElementById('fecha')||{}).value||'';
+  let fechaStr='';
+  if(fecha){const d=new Date(fecha+'T12:00:00');fechaStr=d.getDate()+'-'+(d.getMonth()+1);}
+  const grupo=getGrupoNombre();
+  const tipoShort=getTipoActShort();
+  if(selectedGrupos[0]==='General')return('General '+fechaStr).trim();
+  if(tipoShort==='Jag')return(grupo+' Jag '+fechaStr).trim();
+  return[grupo,tipoShort,fechaStr].filter(Boolean).join(' ');
+}
+
+// ══════════════════════════════════════════════════════
+// DRIVE ACTIVITY FOLDERS & FOLDER SELECTOR
+// ══════════════════════════════════════════════════════
+
+const TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad General','Actividad Jaguim','Actividad Picante','Actividad de Terror'];
+let selectedTipoAct = '';
+
+function renderTipoActChips() {
+  const c = document.getElementById('tipoActChips'); if(!c) return;
+  c.innerHTML = TIPOS_ACT.map(t =>
+    `<button class="tipo-act-chip${selectedTipoAct===t?' active':''}" data-tipo="${t}" onclick="selectTipoAct('${t}')">${t}</button>`
+  ).join('');
+}
+
+function selectTipoAct(t) {
+  selectedTipoAct = selectedTipoAct === t ? '' : t;
+  renderTipoActChips();
+  const jw = document.getElementById('jagWrap');
+  if(jw) jw.classList.toggle('visible', selectedTipoAct === 'Actividad Jaguim');
+  // If General selected, auto-set grupo to General
+  if(selectedTipoAct === 'Actividad General' && selectedGrupos[0] !== 'General') {
+    // just save, don't force grupo
+  }
+  saveAll();
+}
+
+function getTipoActShort() {
+  const map = {'Actividad Chill':'Chill','Actividad Deportiva':'Deportiva','Actividad General':'General','Actividad Jaguim':'Jag','Actividad Picante':'Picante','Actividad de Terror':'Terror'};
+  return map[selectedTipoAct] || '';
+}
+
+// Keep onTipoActChange as no-op for compat
+function onTipoActChange() {}
+
+const ACTIVITY_FOLDERS=['Actividades Chill','Actividades Deportivas','Actividades Generales','Actividades Jaguim','Actividades Picantes','Actividades de Terror'];
+const ACTIVITY_FOLDER_MAP={'Actividad Chill':'Actividades Chill','Actividad Deportiva':'Actividades Deportivas','Actividad General':'Actividades Generales','Actividad Jaguim':'Actividades Jaguim','Actividad Picante':'Actividades Picantes','Actividad de Terror':'Actividades de Terror'};
+let driveRootFolders={};
+let pendingBlob=null,pendingName=null;
+
+async function ensureActivityFolders(){
+  const q=`mimeType='application/vnd.google-apps.folder' and '${CARPETA_RAIZ_ID}' in parents and trashed=false`;
+  const r=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
+  const ex={};(r.files||[]).forEach(f=>ex[f.name.toLowerCase()]=f.id);
+  for(const name of ACTIVITY_FOLDERS){
+    if(!ex[name.toLowerCase()]){
+      const c=await driveApi('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:[CARPETA_RAIZ_ID]})});
+      ex[name.toLowerCase()]=c.id;
+    }
+  }
+  driveRootFolders=ex;
+}
+
+async function ejecutarSubida(){
+  const btn=document.getElementById('btnDrive');
+  const origHtml=btn.innerHTML;
+  btn.disabled=true;btn.textContent='⏳ Preparando...';
+  try{
+    await ensureActivityFolders();
+    pendingBlob=await generarPdfBlob();
+    pendingName=getNombreArchivo();
+    abrirDriveFolderModal();
+  }catch(e){showToast('Error: '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML=origHtml;}
+}
+
+function abrirDriveFolderModal(){
+  const body=document.getElementById('dfmBody');
+  const tipoAct=selectedTipoAct||'';
+  const actFolder=ACTIVITY_FOLDER_MAP[tipoAct]||'';
+  const pre=new Set();
+  selectedGrupos.forEach(g=>{if(g!=='General')pre.add(g.toLowerCase());});
+  if(selectedGrupos[0]==='General')pre.add('actividades generales');
+  if(actFolder)pre.add(actFolder.toLowerCase());
+  // Admins: no pre-selection (they can pick manually)
+  const allNames=Object.keys(driveRootFolders);
+  const grpF=ALL_GRUPOS.filter(g=>allNames.includes(g.toLowerCase()));
+  const actF=ACTIVITY_FOLDERS.filter(af=>allNames.includes(af.toLowerCase()));
+  let html='';
+  if(grpF.length){
+    html+=`<div class="dfm-section"><div class="dfm-section-lbl">Carpetas de grupos</div>`;
+    grpF.forEach(g=>{html+=`<label class="dfm-folder-item"><input type="checkbox" value="${g}" ${pre.has(g.toLowerCase())?'checked':''}/><span class="dfm-folder-icon">📁</span><span class="dfm-folder-name">${g}</span></label>`;});
+    html+='</div>';
+  }
+  if(actF.length){
+    html+=`<div class="dfm-section"><div class="dfm-section-lbl">Carpetas de actividades</div>`;
+    actF.forEach(af=>{html+=`<label class="dfm-folder-item"><input type="checkbox" value="${af}" ${pre.has(af.toLowerCase())?'checked':''}/><span class="dfm-folder-icon">📁</span><span class="dfm-folder-name">${af}</span></label>`;});
+    html+='</div>';
+  }
+  body.innerHTML=html||'<p style="color:var(--text-muted);font-size:13px;">No hay carpetas disponibles.</p>';
+  document.getElementById('driveFolderModal').classList.add('open');
+}
+
+function cerrarDriveFolderModal(){document.getElementById('driveFolderModal').classList.remove('open');pendingBlob=null;pendingName=null;}
+
+async function confirmarSubidaDrive(){
+  if(!pendingBlob||!pendingName)return;
+  const sel=Array.from(document.querySelectorAll('#dfmBody input[type=checkbox]:checked')).map(c=>c.value);
+  if(!sel.length){showToast('Seleccioná al menos una carpeta');return;}
+  const confirmBtn=document.getElementById('dfmConfirmBtn');
+  confirmBtn.disabled=true;confirmBtn.textContent='⏳ Subiendo...';
+  let ok=0;
+  for(const name of sel){
+    try{
+      const fid=driveRootFolders[name.toLowerCase()];if(!fid)continue;
+      const form=new FormData();
+      form.append('metadata',new Blob([JSON.stringify({name:pendingName+'.pdf',parents:[fid],mimeType:'application/pdf'})],{type:'application/json'}));
+      form.append('file',pendingBlob);
+      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${gAccessToken}`},body:form});
+      const d=await r.json();if(d.id)ok++;
+    }catch(e){}
+  }
+  cerrarDriveFolderModal();
+  showToast(ok>0?`✓ "${pendingName}" subido a ${ok} carpeta${ok>1?'s':''}`:'Error al subir');
+  confirmBtn.disabled=false;
+}
+
+// ══════════════════════════════════════════════════════
+// SYNC VIA DRIVE
+// ══════════════════════════════════════════════════════
+const SYNC_FILE='_sync.json';
+
+async function sincronizarDesdeDrive() {
+  // Need Drive auth first
+  if (!gAccessToken) {
+    showToast('Primero autenticate con Google usando el botón "Subir Planificación"');
+    closeModal();
+    return;
+  }
+  closeModal();
+  showToast('☁️ Cargando desde Drive...');
+  const data = await loadFromDrive();
+  if (data) {
+    applySyncData(data);
+    showToast('✓ Planificación cargada desde Drive');
+  } else {
+    showToast('No se encontró ninguna planificación en Drive');
+  }
+}
+
+async function syncToDrive(){
+  if(!gAccessToken||!selectedGrupos.length)return;
+  try{
+    const gn=getGrupoNombre();const fid=driveRootFolders[gn.toLowerCase()];if(!fid)return;
+    const data={_sync:true,ts:Date.now(),selectedGrupos,madrijim,momentos,fields:{}};
+    ['grupo','fecha','tema','contenido','objetivo','hilo','tipoActividad','jagText'].forEach(id=>{const el=document.getElementById(id);if(el)data.fields[id]=el.value||'';});
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const q=`name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
+    const s=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify({name:SYNC_FILE,parents:[fid],mimeType:'application/json'})],{type:'application/json'}));
+    form.append('file',blob);
+    if(s.files&&s.files.length){await fetch(`https://www.googleapis.com/upload/drive/v3/files/${s.files[0].id}?uploadType=multipart`,{method:'PATCH',headers:{Authorization:`Bearer ${gAccessToken}`},body:form});}
+    else{await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${gAccessToken}`},body:form});}
+  }catch(e){}
+}
+
+async function loadFromDrive(){
+  if(!gAccessToken)return null;
+  try{
+    await ensureActivityFolders();
+    const gn=getGrupoNombre()||(currentUser&&currentUser.grupo)||'';
+    const fid=driveRootFolders[gn.toLowerCase()];if(!fid)return null;
+    const q=`name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
+    const s=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+    if(!s.files||!s.files.length)return null;
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files/${s.files[0].id}?alt=media`,{headers:{Authorization:`Bearer ${gAccessToken}`}});
+    return await r.json();
+  }catch(e){return null;}
+}
+
+function applySyncData(data){
+  if(!data||!data._sync)return;
+  if(data.selectedGrupos){selectedGrupos=data.selectedGrupos;renderGrupoChips();}
+  if(data.madrijim){madrijim=data.madrijim;renderTeam();}
+  if(data.momentos){
+    momentos=data.momentos.map((m,i)=>({
+      ...m, id:i+1,
+      materiales:(m.materiales||[]).map(it=>({text:it.text||it,asignados:[]})),
+      roles:(m.roles||[]).map(it=>({text:it.text||it,asignados:[]}))
+    }));
+    nextId=momentos.length+1;renderAll();
+  }
+  if(data.fields){
+    Object.entries(data.fields).forEach(([id,val])=>{if(id==='tipoActividad'||id==='selectedTipoAct')return;const el=document.getElementById(id);if(el)el.value=val||'';});
+    if(data.fields.tipoActividad){selectedTipoAct=data.fields.tipoActividad;renderTipoActChips();}
+  }
+}
+
+const GRUPO_MADRIJIM = {
+  Leshatef:['Cami','Larsi','Manu','Lucas'],
+  Meretz:  ['Jusa','Luki','Tali','Guido'],
+  Teshuka: ['Ema','Luana','Doby','Tomi'],
+  Letamid: ['Marta','Kiara','Vato','Alan'],
+  Nitzajon:['Solchu','Ezi','Martu'],
+  Mejudash:['Valencha','Aieka','Juli'],
+};
+const TIPOS = ['Recibimiento','Traslado','Juego','Merienda','Cierre'];
+
+let madrijim=[], momentos=[], nextId=1;
+let dragSrcId=null;
+
+// ── Persistence ───────────────────────────────────
+function saveAll() {
+  try {
+    localStorage.setItem('cissab_v2_mad', JSON.stringify(madrijim));
+    localStorage.setItem('cissab_v2_mom', JSON.stringify(momentos));
+    localStorage.setItem('cissab_v2_nid', String(nextId));
+    ['fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
+      localStorage.setItem('cissab_v2_'+id, document.getElementById(id).value||'');
+    });
+    localStorage.setItem('cissab_v2_selectedGrupos', JSON.stringify(selectedGrupos));
+    localStorage.setItem('cissab_v2_tipoActividad', selectedTipoAct||'');
+    localStorage.setItem('cissab_v2_jagText', (document.getElementById('jagText')||{}).value||'');
+  } catch(e){}
+}
+function loadAll() {
+  try {
+    const m=localStorage.getItem('cissab_v2_mad');
+    const mo=localStorage.getItem('cissab_v2_mom');
+    const ni=localStorage.getItem('cissab_v2_nid');
+    if(m)  madrijim=JSON.parse(m);
+    if(mo) momentos=JSON.parse(mo);
+    if(ni) nextId=parseInt(ni)||1;
+    ['grupo','fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
+      const v=localStorage.getItem('cissab_v2_'+id);
+      if(v!==null) document.getElementById(id).value=v;
+    });
+  } catch(e){}
+}
+
+// ── Group preset ──────────────────────────────────
+function onGrupoChange() {
+  const g=document.getElementById('grupo').value;
+  if(g && GRUPO_MADRIJIM[g]) {
+    madrijim=[...GRUPO_MADRIJIM[g]];
+    renderTeam(); renderAll(); saveAll();
+  }
+}
+
+// ── Team ──────────────────────────────────────────
+function addMadrij() {
+  const inp=document.getElementById('teamInput');
+  const n=inp.value.trim();
+  if(!n||madrijim.includes(n)){inp.value='';return;}
+  madrijim.push(n); inp.value='';
+  renderTeam(); renderAll(); saveAll();
+}
+function removeMadrij(n) {
+  madrijim=madrijim.filter(m=>m!==n);
+  momentos.forEach(m=>{
+    m.materiales.forEach(x=>x.asignados=x.asignados.filter(a=>a!==n));
+    m.roles.forEach(x=>x.asignados=x.asignados.filter(a=>a!==n));
+  });
+  renderTeam(); renderAll(); saveAll();
+}
+function renderTeam() {
+  document.getElementById('teamChips').innerHTML=madrijim.map(n=>
+    `<span class="team-chip">${esc(n)}<button class="chip-del" onclick="removeMadrij('${esc(n)}')" aria-label="Quitar">×</button></span>`
+  ).join('');
+}
+
+// ── Momentos ──────────────────────────────────────
+function lastCierre() {
+  for(let i=momentos.length-1;i>=0;i--){
+    const t=(momentos[i].horaCierre||'').trim();
+    if(t) return t;
+  }
+  return '';
+}
+function addMomento() {
+  const id=nextId++;
+  momentos.push({id,tipo:'Juego',horaInicio:lastCierre(),horaCierre:'',
+    desc:'',lugar:'',materiales:[],intOpen:false,int:'',roles:[],din:'',
+    addingMat:false,addingRol:false});
+  renderAll(); saveAll();
+  setTimeout(()=>{const el=document.getElementById('row-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);
+}
+function deleteMomento(id){momentos=momentos.filter(m=>m.id!==id);renderAll();saveAll();}
+function upd(id,field,val){const m=momentos.find(m=>m.id===id);if(m){m[field]=val;saveAll();}}
+function setTipo(id,tipo){
+  const m=momentos.find(m=>m.id===id);
+  if(!m)return;
+  m.tipo=tipo;
+  if(tipo!=='Personalizado')m.customTipo='';
+  closeDD();renderAll();saveAll();
+}
+function toggleInt(id){const m=momentos.find(m=>m.id===id);if(m)m.intOpen=!m.intOpen;renderAll();saveAll();}
+
+// ── Items ─────────────────────────────────────────
+function startAdding(id,lista){
+  const m=momentos.find(m=>m.id===id);if(!m)return;
+  if(lista==='materiales')m.addingMat=true;else m.addingRol=true;
+  renderAll();
+  setTimeout(()=>{const inp=document.getElementById(`inp-${lista}-${id}`);if(inp)inp.focus();},30);
+}
+function confirmItem(id,lista){
+  const inp=document.getElementById(`inp-${lista}-${id}`);if(!inp)return;
+  const val=inp.value.trim();
+  const m=momentos.find(m=>m.id===id);if(!m)return;
+  if(val)m[lista].push({text:val,asignados:[]});
+  if(lista==='materiales')m.addingMat=true;else m.addingRol=true;
+  renderAll();saveAll();
+  setTimeout(()=>{const next=document.getElementById(`inp-${lista}-${id}`);if(next)next.focus();},30);
+}
+function cancelAdding(id,lista){
+  const m=momentos.find(m=>m.id===id);if(!m)return;
+  if(lista==='materiales')m.addingMat=false;else m.addingRol=false;
+  renderAll();
+}
+function removeItem(id,lista,idx){const m=momentos.find(m=>m.id===id);if(m){m[lista].splice(idx,1);renderAll();saveAll();}}
+function toggleAsign(id,lista,idx,nombre){
+  const m=momentos.find(m=>m.id===id);if(!m)return;
+  const arr=m[lista][idx].asignados;
+  const i=arr.indexOf(nombre);if(i>=0)arr.splice(i,1);else arr.push(nombre);
+  renderAll();saveAll();
+}
+function handleItemKey(e,id,lista){
+  if(e.key==='Enter'){e.preventDefault();confirmItem(id,lista);}
+  else if(e.key==='Escape')cancelAdding(id,lista);
+}
+
+// ── Drag ─────────────────────────────────────────
+function onDragStart(e,id){dragSrcId=id;e.dataTransfer.effectAllowed='move';setTimeout(()=>{const el=document.getElementById('row-'+id);if(el)el.classList.add('dragging');},0);}
+function onDragEnd(){dragSrcId=null;document.querySelectorAll('.momento').forEach(el=>el.classList.remove('dragging','drag-over'));}
+function onDragOver(e,id){e.preventDefault();document.querySelectorAll('.momento').forEach(el=>el.classList.remove('drag-over'));if(id!==dragSrcId){const el=document.getElementById('row-'+id);if(el)el.classList.add('drag-over');}}
+function onDrop(e,id){e.preventDefault();if(dragSrcId===null||dragSrcId===id)return;const si=momentos.findIndex(m=>m.id===dragSrcId);const ti=momentos.findIndex(m=>m.id===id);const[moved]=momentos.splice(si,1);momentos.splice(ti,0,moved);renderAll();saveAll();}
+
+// ── Dropdown (fixed so never clipped) ─────────────
+let openDDId=null;
+function toggleDD(id,btn){
+  if(openDDId===id){closeDD();return;}
+  closeDD();
+  // Move dropdown to <body> so no parent overflow clips it
+  let dd=document.getElementById('dd-'+id);
+  if(!dd)return;
+  if(dd.parentElement!==document.body) document.body.appendChild(dd);
+  const rect=btn.getBoundingClientRect();
+  const ddH=TIPOS.length*38+8;
+  const below=window.innerHeight-rect.bottom;
+  // position in viewport coords (fixed doesn't use scroll)
+  if(below<ddH+8) dd.style.top=(rect.top-ddH-4)+'px';
+  else             dd.style.top=(rect.bottom+4)+'px';
+  dd.style.left=rect.left+'px';
+  dd.classList.add('open');
+  openDDId=id;
+}
+function closeDD(){document.querySelectorAll('.tipo-dropdown').forEach(d=>d.classList.remove('open'));openDDId=null;}
+document.addEventListener('click',e=>{if(!e.target.closest('.tipo-wrap')&&!e.target.closest('.tipo-dropdown'))closeDD();});
+
+// ── Render ────────────────────────────────────────
+function renderItems(m,lista){
+  const items=m[lista];
+  const isAdding=lista==='materiales'?m.addingMat:m.addingRol;
+  const ph=lista==='materiales'?'ej: pelota...':'ej: animar el juego...';
+  let html='<div class="items-list">';
+  items.forEach((item,idx)=>{
+    const chips=madrijim.map(n=>
+      `<span class="assign-chip${item.asignados.includes(n)?' on':''}" onclick="toggleAsign(${m.id},'${lista}',${idx},'${esc(n)}')">${n.split(' ')[0]}</span>`
+    ).join('');
+    const cissabChip=lista==='materiales'?`<span class="assign-chip${item.asignados.includes('Cissab')?' on':''}" onclick="toggleAsign(${m.id},'${lista}',${idx},'Cissab')">Cissab</span>`:'';
+    const allChips=cissabChip+chips;
+    html+=`<div class="item-row"><div class="item-top"><span class="item-text">· ${esc(item.text)}</span><button class="item-del" onclick="removeItem(${m.id},'${lista}',${idx})" aria-label="quitar">×</button></div>${(madrijim.length||lista==='materiales')?`<div class="assign-chips">${allChips}</div>`:''}</div>`;
+  });
+  html+='</div>';
+  if(isAdding){
+    html+=`<div class="adding-row"><input class="adding-input" id="inp-${lista}-${m.id}" placeholder="${ph}" onkeydown="handleItemKey(event,${m.id},'${lista}')"/><button class="confirm-btn" onclick="confirmItem(${m.id},'${lista}')">✓</button><button class="item-del" onclick="cancelAdding(${m.id},'${lista}')" style="font-size:15px;">×</button></div>`;
+  } else {
+    html+=`<button class="add-item-btn" onclick="startAdding(${m.id},'${lista}')">+ agregar</button>`;
+  }
+  return html;
+}
+
+
+
+// ══════════════════════════════════════════════════
+// GOOGLE DRIVE UPLOAD
+// ══════════════════════════════════════════════════
+
+// ▶ CONFIGURACIÓN
+const GDRIVE_CLIENT_ID = '102705327045-hh3h2drnhphfccbjg9g8fm6kf2agq6ei.apps.googleusercontent.com';
+
+// Emails autorizados para subir al Drive
+// IMPORTANTE: en Google Cloud Console > Credenciales, agregar:
+//   https://plani-cissab.vercel.app como origen JS autorizado
+const AUTHORIZED_EMAILS = [
+  'cissabmeretz@gmail.com',
+  'leshatef.cissab@gmail.com',
+  'letamid26@gmail.com',
+  'mejudashcissab@gmail.com',
+  'moadon@cissab.org.ar',
+  'nitzajoncissab@gmail.com',
+  'santiagorojkes@gmail.com',
+  'teshukacissab@gmail.com',
+];
+
+// ID fijo de la carpeta "Planificaciones" en Drive (no cambiar)
+const CARPETA_RAIZ_ID = '1hiLmTa_gwzq39fmbUadm8utnhL-XiUme';
+
+let gAccessToken = null;
+let gTokenClient = null;
+let driveUploadPending = false;
+
+function iniciarGoogleAuth() {
+  if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID === 'TU_CLIENT_ID_AQUI') {
+    showToast('⚠ Falta configurar el Google Client ID');
+    return;
+  }
+  if (!window.google) {
+    showToast('Cargando autenticación de Google...');
+    setTimeout(iniciarGoogleAuth, 1000);
+    return;
+  }
+  if (!gTokenClient) {
+    const storedEmail = localStorage.getItem('cissab_group_email') || '';
+    gTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GDRIVE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive',
+      login_hint: storedEmail,
+      callback: async (resp) => {
+        if (resp.error) { showToast('Error al conectar con Google: ' + resp.error); return; }
+        // Verify the signed-in email matches authorized list
+        try {
+          const userInfo = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: 'Bearer ' + resp.access_token }
+          }).then(r => r.json());
+          const email = (userInfo.email || '').toLowerCase();
+          if (!AUTHORIZED_EMAILS.map(e => e.toLowerCase()).includes(email)) {
+            showToast('❌ ' + email + ' no está autorizado para subir al Drive');
+            return;
+          }
+        } catch(e) {}
+        gAccessToken = resp.access_token;
+        // Create activity folders eagerly
+        ensureActivityFolders().catch(()=>{});
+        if (driveUploadPending) { driveUploadPending = false; await ejecutarSubida(); }
+      }
+    });
+  }
+  driveUploadPending = true;
+  if (gAccessToken) { driveUploadPending = false; ejecutarSubida(); }
+  else gTokenClient.requestAccessToken({ prompt: '' });
+}
+
+
+
+async function driveApi(url, options = {}) {
+  const resp = await fetch(url, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${gAccessToken}` }
+  });
+  if (resp.status === 401) { gAccessToken = null; throw new Error('Token expirado'); }
+  return resp.json();
+}
+
+async function buscarCarpetaGrupo(nombreGrupo) {
+  // Lista TODAS las carpetas dentro de Planificaciones y busca por nombre ignorando mayúsculas
+  const q = `mimeType='application/vnd.google-apps.folder' and '${CARPETA_RAIZ_ID}' in parents and trashed=false`;
+  const result = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50`);
+  if (result.files && result.files.length > 0) {
+    const match = result.files.find(f => f.name.toLowerCase() === nombreGrupo.toLowerCase());
+    if (match) return match.id;
+  }
+  // Si no existe con ningún case, la crea
+  const creado = await driveApi('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: nombreGrupo, mimeType: 'application/vnd.google-apps.folder', parents: [CARPETA_RAIZ_ID] })
+  });
+  return creado.id;
+}
+
+async function generarPdfBlob() {
+  // Generamos el mismo HTML que en la vista de impresión
+  const grupo   = getGrupoNombre();
+  const fecha   = document.getElementById('fecha').value    || '';
+  const tema    = document.getElementById('tema').value     || '';
+  const contenido = document.getElementById('contenido').value || '';
+  const obj     = document.getElementById('objetivo').value || '';
+  const hilo    = document.getElementById('hilo').value     || '';
+  const equipoHtml = madrijim.map(n => `<span style="color:#7a5c44;font-weight:500;">${n}</span>`).join(`<span style="color:#c4a68a;">  ·  </span>`);
+  const TC = {
+    Recibimiento:{bg:'#dbeafe',color:'#1e3a5f'},
+    Traslado:    {bg:'#f1f0ed',color:'#3d3b37'},
+    Juego:       {bg:'#dcfce7',color:'#14532d'},
+    Merienda:    {bg:'#fef3c7',color:'#78350f'},
+    Cierre:      {bg:'#fce7f3',color:'#831843'},
+  };
+  function fi(items) {
+    if (!items || !items.length) return '—';
+    return items.map(item => {
+      const asig = item.asignados && item.asignados.length
+        ? ' <b style="color:#e8630a;font-style:normal;">→ ' + item.asignados.join(', ') + '</b>' : '';
+      return '· ' + item.text + asig;
+    }).join('<br>');
+  }
+  const momentosHtml = momentos.map(m => {
+    const c = TC[m.tipo] || {bg:'#f1f0ed', color:'#333'};
+    return `
+      <div class="momento-block">
+        <div class="momento-header">
+          <span class="tipo-pill" style="background:${c.bg};color:${c.color};">${m.tipo}</span>
+          <span class="momento-hora">${m.horaInicio || ''}${m.horaInicio && m.horaCierre ? ' → ' : ''}${m.horaCierre || ''}</span>
+        </div>
+        <div class="campo-full">
+          <div class="campo-lbl">Desarrollo de la actividad</div>
+          <div class="campo-val">${m.desc || '—'}</div>
+        </div>
+        <div class="campos-grid">
+          <div class="campo"><div class="campo-lbl">Lugar</div><div class="campo-val">${m.lugar || '—'}</div></div>
+          <div class="campo"><div class="campo-lbl">Materiales</div><div class="campo-val">${fi(m.materiales)}</div></div>
+          <div class="campo"><div class="campo-lbl">Intendencia</div><div class="campo-val">${m.intOpen && m.int ? m.int : '—'}</div></div>
+          <div class="campo"><div class="campo-lbl">Roles</div><div class="campo-val">${fi(m.roles)}</div></div>
+        </div>
+        <div class="campo-full">
+          <div class="campo-lbl">Dinámica e intervenciones</div>
+          <div class="campo-val">${m.din || '—'}</div>
+        </div>
+      </div>`;
+  }).join('');
+  const printHtml = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Arial,sans-serif; font-size:12px; color:#1a1917; background:#fff; width:794px; padding:8px 10px; }
+  .page-top { background:#e8630a; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-radius:4px; margin-bottom:10px; }
+  .logo-txt { color:#fff; font-size:18px; font-weight:800; }
+  .page-top-right { text-align:right; color:#fff; }
+  .plan-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+  .tagline { font-size:9px; opacity:.75; font-style:italic; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; border:1px solid #fcd9c0; border-radius:4px; overflow:hidden; margin-bottom:6px; }
+  .info-cell { padding:6px 10px; border-right:1px solid #fcd9c0; border-bottom:1px solid #fcd9c0; background:#fff; }
+  .info-cell:nth-child(even) { border-right:none; }
+  .info-cell.full { grid-column:span 2; border-right:none; }
+  .info-lbl { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#e8630a; margin-bottom:2px; }
+  .info-val { font-size:11px; color:#1a1917; }
+  .hilo-bar { background:#fff3eb; border:1px solid #fcd9c0; border-radius:4px; padding:6px 10px; margin-bottom:6px; display:flex; align-items:flex-start; gap:8px; }
+  .hilo-line { width:3px; min-height:28px; background:#e8630a; border-radius:2px; flex-shrink:0; }
+  .hilo-lbl { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#e8630a; margin-bottom:2px; }
+  .hilo-val { font-size:11px; color:#7a3a10; }
+  .equipo-bar { font-size:10px; color:#7a5c44; margin-bottom:10px; padding:3px 0; }
+  .equipo-bar strong { color:#1a1917; text-transform:uppercase; font-size:8px; letter-spacing:.07em; margin-right:5px; }
+  .momento-block { background:#fff; margin-bottom:14px; }
+  .momento-header { background:#fff3eb; padding:8px 12px; display:flex; align-items:center; gap:10px; border-left:4px solid #e8630a; margin-bottom:6px; }
+  .tipo-pill { font-size:10px; font-weight:700; padding:3px 12px; border-radius:20px; display:inline-block; }
+  .momento-hora { font-family:'Courier New',monospace; font-size:12px; font-weight:600; color:#7a5c44; }
+  .campo-full { padding:5px 0; background:#fff; }
+  .campo-full + .campo-full { border-top:1px solid #fcd9c0; }
+  .campo-full:last-child { border-bottom:1px solid #fcd9c0; }
+  .campos-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; border-top:1px solid #fcd9c0; border-bottom:1px solid #fcd9c0; background:#fff; margin:6px 0; }
+  .campo { padding:6px 10px; background:#fff; border-right:1px solid #fcd9c0; }
+  .campo:last-child { border-right:none; }
+  .campo-lbl { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#e8630a; margin-bottom:3px; }
+  .campo-val { font-size:10px; color:#1a1917; line-height:1.5; word-break:break-word; white-space:pre-wrap; }
+</style></head><body>
+<div class="page-top">
+  <div class="logo-txt">CISSAB</div>
+  <div class="page-top-right">
+    <div class="plan-title">Hoja de Planificación</div>
+    <div class="tagline">#MiCorazónLateNaranja</div>
+  </div>
+</div>
+<div class="info-grid">
+  <div class="info-cell"><div class="info-lbl">Grupo</div><div class="info-val">${grupo}</div></div>
+  <div class="info-cell"><div class="info-lbl">Fecha</div><div class="info-val">${fecha}</div></div>
+  <div class="info-cell"><div class="info-lbl">Tema</div><div class="info-val">${tema}</div></div>
+  <div class="info-cell"><div class="info-lbl">Contenido</div><div class="info-val">${contenido}</div></div>
+  <div class="info-cell full"><div class="info-lbl">Objetivo</div><div class="info-val">${obj}</div></div>
+</div>
+<div class="hilo-bar">
+  <div class="hilo-line"></div>
+  <div><div class="hilo-lbl">Hilo conductor</div><div class="hilo-val">${hilo}</div></div>
+</div>
+<div class="equipo-bar" style="font-size:10px;margin-bottom:10px;background:#ffffff;padding:2px 0;"><b style="text-transform:uppercase;font-size:8px;letter-spacing:.07em;margin-right:6px;color:#333333;">EQUIPO</b> ${equipoHtml}</div>
+${momentosHtml}
+</body></html>`;
+
+  // Use iframe for rendering — completely isolated from main page, no layout shifts
+  const SCALE = 2;
+  const PAGE_W_PX = 794;
+  const PAGE_W_MM = 210;
+  const PAGE_H_MM = 297;
+  const MM_PER_PX = PAGE_W_MM / PAGE_W_PX;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:' + PAGE_W_PX + 'px;height:800px;border:none;visibility:hidden;';
+  document.body.appendChild(iframe);
+
+  await new Promise(resolve => {
+    iframe.onload = resolve;
+    iframe.srcdoc = printHtml;
+    setTimeout(resolve, 1500); // fallback timeout
+  });
+
+  // Extra wait for fonts/layout
+  await new Promise(r => setTimeout(r, 300));
+
+  const iDoc = iframe.contentDocument;
+  const headerEls = Array.from(iDoc.querySelectorAll('.page-top, .info-grid, .hilo-bar, .equipo-bar'));
+  const momentoEls = Array.from(iDoc.querySelectorAll('.momento-block'));
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Embed planning data as PDF metadata for reliable re-import
+  const planData = {
+    _v: 2, // version marker so we know it's our format
+    grupo:    getGrupoNombre(),
+    fecha:    document.getElementById('fecha').value    || '',
+    tema:     document.getElementById('tema').value     || '',
+    contenido:document.getElementById('contenido').value|| '',
+    objetivo: document.getElementById('objetivo').value || '',
+    hilo:     document.getElementById('hilo').value     || '',
+    madrijim,
+    momentos: momentos.map(m => ({
+      tipo:m.tipo, horaInicio:m.horaInicio, horaCierre:m.horaCierre,
+      desc:m.desc, lugar:m.lugar, din:m.din, int:m.int, intOpen:m.intOpen,
+      materiales:m.materiales, roles:m.roles
+    }))
+  };
+  pdf.setProperties({
+    title:   'Planificación Cissab - ' + (planData.grupo||'') + ' - ' + (planData.fecha||''),
+    subject: btoa(unescape(encodeURIComponent(JSON.stringify(planData)))),
+    keywords:'cissab-planificacion-v2',
+    creator: 'planicissab.netlify.app',
+  });
+  let curY = 0;
+
+  async function renderEl(el) {
+    const c = await html2canvas(el, {
+      scale: SCALE, useCORS: true, backgroundColor: '#ffffff',
+      scrollX: 0, scrollY: 0,
+      width: PAGE_W_PX, windowWidth: PAGE_W_PX
+    });
+    return { canvas: c, hMM: (c.height / SCALE) * MM_PER_PX };
+  }
+
+  for (const el of headerEls) {
+    const { canvas: c, hMM } = await renderEl(el);
+    if (curY + hMM > PAGE_H_MM && curY > 0) { pdf.addPage(); curY = 0; }
+    const M = 8; // 8mm margins left+right
+    pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', M, curY, PAGE_W_MM - M*2, hMM);
+    curY += hMM + 1.5;
+  }
+
+  for (const el of momentoEls) {
+    const { canvas: c, hMM } = await renderEl(el);
+    if (curY + hMM > PAGE_H_MM && curY > 0) { pdf.addPage(); curY = 0; }
+    const M = 8;
+    pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', M, curY, PAGE_W_MM - M*2, hMM);
+    curY += hMM + 2;
+  }
+
+  document.body.removeChild(iframe);
+  return pdf.output('blob');
+}
+
+async function ejecutarSubida() {
+  const btn = document.getElementById('btnDrive');
+  const nombreArchivo = getNombreArchivo();
+  const grupo = document.getElementById('grupo').value || 'Sin grupo';
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando PDF...';
+
+  let pdfBlob;
+  try { pdfBlob = await generarPdfBlob(); }
+  catch(e) { showToast('Error generando el PDF: ' + e.message); btn.disabled=false; btn.innerHTML='&#9650; Drive'; return; }
+
+  btn.textContent = '⏳ Subiendo a Drive...';
+
+  try {
+    // Buscar subcarpeta del grupo dentro de la carpeta Planificaciones
+    const grupoId = await buscarCarpetaGrupo(grupo);
+
+    // Subir el PDF
+    const metadata = { name: nombreArchivo + '.pdf', parents: [grupoId], mimeType: 'application/pdf' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', pdfBlob);
+
+    const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${gAccessToken}` },
+      body: form
+    });
+    const data = await resp.json();
+
+    if (data.id) {
+      showToast('✓ "' + nombreArchivo + '" subido a Drive');
+    } else {
+      throw new Error(JSON.stringify(data.error || data));
+    }
+  } catch(e) {
+    if (e.message === 'Token expirado') {
+      gTokenClient.requestAccessToken({ prompt: '' });
+      driveUploadPending = true;
+    } else {
+      showToast('Error al subir: ' + e.message);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#9650; Drive';
+  }
+}
+
+async function descargarPdf() {
+  const btn = document.getElementById('btnPdf');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando...';
+  try {
+    const blob = await generarPdfBlob();
+    const nombre = getNombreArchivo();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch(e) {
+    showToast('Error generando el PDF: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#128438; Guardar PDF';
+  }
+}
+
+
+async function subirADrive() {
+  if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID === 'TU_CLIENT_ID_AQUI') {
+    showToast('⚠ Configurá el Google Client ID en el archivo');
+    return;
+  }
+  iniciarGoogleAuth();
+}
+
+// ── AUTO-RESIZE TEXTAREAS ─────────────────────────
+function autoResize(el) {
+  const minH = 36;
+  el.style.minHeight = minH + 'px';
+  el.style.height = minH + 'px'; // shrink to min first
+  el.style.height = el.scrollHeight + 'px'; // then grow to content
+}
+function autoResizeAll() {
+  document.querySelectorAll('.cell-input').forEach(autoResize);
+}
+
+function renderAll(){
+  const body=document.getElementById('momentosBody');
+  body.innerHTML=momentos.map(m=>`
+    <div class="momento col-grid" id="row-${m.id}"
+      draggable="true"
+      ondragstart="onDragStart(event,${m.id})"
+      ondragend="onDragEnd()"
+      ondragover="onDragOver(event,${m.id})"
+      ondrop="onDrop(event,${m.id})">
+
+      <div class="mcell drag-handle" style="padding:0;" title="Arrastrar para reordenar">
+        <div class="drag-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+
+      <div class="mcell">
+        <div class="time-pair">
+          <div class="time-row">
+            <span class="time-lbl">De</span>
+            <input class="time-input" type="text" placeholder="16:00" value="${esc(m.horaInicio)}" oninput="upd(${m.id},'horaInicio',this.value)"/>
+          </div>
+          <div class="time-row">
+            <span class="time-lbl">A</span>
+            <input class="time-input" type="text" placeholder="16:30" value="${esc(m.horaCierre)}" oninput="upd(${m.id},'horaCierre',this.value)"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="mcell">
+        <div class="tipo-wrap">
+          <button class="tipo-badge tipo-${m.tipo}" onclick="toggleDD(${m.id},this)">
+            ${m.tipo==='Personalizado'
+              ? `<input class="custom-tipo-input" value="${esc(m.customTipo||'')}" placeholder="Nombrar..." onclick="event.stopPropagation()" oninput="event.stopPropagation();upd(${m.id},'customTipo',this.value)"/>`
+              : `${m.tipo} <span class="arrow">▾</span>`}
+          </button>
+          <div class="tipo-dropdown" id="dd-${m.id}">
+            ${TIPOS.map(t=>`<button class="tipo-opt" onclick="setTipo(${m.id},'${t}')">${t}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="mcell">
+        <div class="textarea-wrap">
+          <textarea class="cell-input" id="desc-${m.id}"  placeholder="Explicá la actividad paso a paso (APB)..." oninput="upd(${m.id},'desc',this.value);autoResize(this)">${esc(m.desc)}</textarea>
+          <button class="mic-btn" onclick="toggleMic(this,'desc-${m.id}',${m.id},'desc')" title="Dictar por voz"><svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="3.5" y="0.5" width="7" height="10" rx="3.5" fill="currentColor"/>
+  <path d="M1 8.5C1 11.538 3.686 14 7 14C10.314 14 13 11.538 13 8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="7" y1="14" x2="7" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="4.5" y1="15.5" x2="9.5" y2="15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+</svg></button>
+        </div>
+      </div>
+
+      <div class="mcell">
+        <textarea class="cell-input" placeholder="¿Dónde?" oninput="upd(${m.id},'lugar',this.value);autoResize(this)">${esc(m.lugar)}</textarea>
+      </div>
+
+      <div class="mcell">${renderItems(m,'materiales')}</div>
+
+      <div class="mcell">
+        ${m.intOpen
+          ?`<textarea class="cell-input"  placeholder="¿Qué necesitan?" oninput="upd(${m.id},'int',this.value);autoResize(this)">${esc(m.int)}</textarea><button class="add-item-btn" onclick="toggleInt(${m.id})" style="color:var(--text-faint);">− quitar</button>`
+          :`<button class="int-trigger" onclick="toggleInt(${m.id})">+ agregar</button>`
+        }
+      </div>
+
+      <div class="mcell">${renderItems(m,'roles')}</div>
+
+      <div class="mcell">
+        <div class="textarea-wrap">
+          <textarea class="cell-input" id="din-${m.id}"  placeholder="Estrategias grupales e individuales..." oninput="upd(${m.id},'din',this.value);autoResize(this)">${esc(m.din)}</textarea>
+          <button class="mic-btn" onclick="toggleMic(this,'din-${m.id}',${m.id},'din')" title="Dictar por voz"><svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="3.5" y="0.5" width="7" height="10" rx="3.5" fill="currentColor"/>
+  <path d="M1 8.5C1 11.538 3.686 14 7 14C10.314 14 13 11.538 13 8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="7" y1="14" x2="7" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="4.5" y1="15.5" x2="9.5" y2="15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+</svg></button>
+        </div>
+      </div>
+
+      <div class="mcell" style="align-items:center;justify-content:center;">
+        <button class="del-row-btn" onclick="deleteMomento(${m.id})" title="Eliminar momento" aria-label="Eliminar momento">🗑</button>
+      </div>
+    </div>
+  `).join('');
+  setTimeout(autoResizeAll, 0);
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+function guardar(){saveAll();showToast('✓ Planificación guardada');syncToDrive().catch(()=>{});}
+function abrirVistaImpresion() {
+  const grupo     = getGrupoNombre();
+  const fecha     = document.getElementById('fecha').value    || '';
+  const tema      = document.getElementById('tema').value     || '';
+  const contenido = document.getElementById('contenido').value|| '';
+  const obj       = document.getElementById('objetivo').value || '';
+  const hilo      = document.getElementById('hilo').value     || '';
+  const equipoHtml = madrijim.map(n => `<span style="color:#7a5c44;font-weight:500;">${n}</span>`).join(`<span style="color:#c4a68a;">  ·  </span>`);
+
+  const TC = {
+    Recibimiento:{bg:'#dbeafe',color:'#1e3a5f'},
+    Traslado:    {bg:'#f1f0ed',color:'#3d3b37'},
+    Juego:       {bg:'#dcfce7',color:'#14532d'},
+    Merienda:    {bg:'#fef3c7',color:'#78350f'},
+    Cierre:      {bg:'#fce7f3',color:'#831843'},
+  };
+
+  function fi(items) {
+    if (!items || !items.length) return '—';
+    return items.map(item => {
+      const asig = item.asignados && item.asignados.length
+        ? ' <b style="color:#e8630a;font-style:normal;">→ ' + item.asignados.join(', ') + '</b>' : '';
+      return '· ' + item.text + asig;
+    }).join('<br>');
+  }
+
+  const momentosHtml = momentos.map(m => {
+    const c = TC[m.tipo] || {bg:'#f1f0ed', color:'#333'};
+    return `
+      <div class="momento-block">
+        <div class="momento-header">
+          <span class="tipo-pill" style="background:${c.bg};color:${c.color};">${m.tipo}</span>
+          <span class="momento-hora">${m.horaInicio || ''}${m.horaInicio && m.horaCierre ? ' → ' : ''}${m.horaCierre || ''}</span>
+        </div>
+        <div class="campo-full">
+          <div class="campo-lbl">Desarrollo de la actividad</div>
+          <div class="campo-val">${m.desc || '—'}</div>
+        </div>
+        <div class="campos-grid">
+          <div class="campo">
+            <div class="campo-lbl">Lugar</div>
+            <div class="campo-val">${m.lugar || '—'}</div>
+          </div>
+          <div class="campo">
+            <div class="campo-lbl">Materiales</div>
+            <div class="campo-val">${fi(m.materiales)}</div>
+          </div>
+          <div class="campo">
+            <div class="campo-lbl">Intendencia</div>
+            <div class="campo-val">${m.intOpen && m.int ? m.int : '—'}</div>
+          </div>
+          <div class="campo">
+            <div class="campo-lbl">Roles</div>
+            <div class="campo-val">${fi(m.roles)}</div>
+          </div>
+        </div>
+        <div class="campo-full">
+          <div class="campo-lbl">Dinámica e intervenciones</div>
+          <div class="campo-val">${m.din || '—'}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Planificación Cissab</title>
+<style>
+  @page { size: A4 portrait; margin: 8mm 8mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1917;
+         background: #fff; width: 100%; }
+
+  /* ── Page header ── */
+  .page-top {
+    background: #e8630a; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: 6px; margin-bottom: 10px;
+  }
+  .logo-txt { color: #fff; font-size: 18px; font-weight: 800;
+              letter-spacing: .04em; }
+  .page-top-right { text-align: right; color: #fff; }
+  .page-top-right .plan-title { font-size: 11px; font-weight: 700;
+                                 text-transform: uppercase; letter-spacing: .08em; }
+  .page-top-right .tagline { font-size: 9px; opacity: .75; font-style: italic; }
+
+  /* ── Info grid ── */
+  .info-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0; border: 1px solid #fcd9c0;
+    border-radius: 6px; overflow: hidden; margin-bottom: 6px;
+  }
+  .info-cell {
+    padding: 6px 10px;
+    border-right: 1px solid #fcd9c0;
+    border-bottom: 1px solid #fcd9c0;
+  }
+  .info-cell:nth-child(even) { border-right: none; }
+  .info-cell.full { grid-column: span 2; border-right: none; }
+  .info-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .07em; color: #e8630a; margin-bottom: 2px; }
+  .info-val { font-size: 11px; color: #1a1917; }
+
+  .hilo-bar {
+    background: #fff3eb; border: 1px solid #fcd9c0; border-radius: 6px;
+    padding: 6px 10px; margin-bottom: 8px;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .hilo-line { width: 3px; min-height: 28px; background: #e8630a;
+               border-radius: 2px; flex-shrink: 0; margin-top: 1px; }
+  .hilo-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .07em; color: #e8630a; margin-bottom: 2px; }
+  .hilo-val { font-size: 11px; color: #7a3a10; }
+
+  .equipo-bar { font-size: 10px; color: #7a5c44; margin-bottom: 10px; }
+  .equipo-bar strong { color: #1a1917; text-transform: uppercase;
+                       font-size: 8px; letter-spacing: .07em; margin-right: 5px; }
+
+.momento-block { background:#fff; margin-bottom:14px; }
+  .momento-header {
+    background:#fff3eb; padding:8px 12px;
+    display:flex; align-items:center; gap:10px;
+    border-left:4px solid #e8630a; margin-bottom:6px;
+  }
+  .tipo-pill { font-size:10px; font-weight:700; padding:3px 12px; border-radius:20px; display:inline-block; }
+  .momento-hora { font-family:'Courier New',monospace; font-size:12px; font-weight:600; color:#7a5c44; }
+  .campo-full { padding:5px 0; background:#fff; }
+  .campo-full + .campo-full { border-top:1px solid #fcd9c0; }
+  .campo-full:last-child { border-bottom:1px solid #fcd9c0; }
+  .campos-grid {
+    display:grid; grid-template-columns:1fr 1fr 1fr 1fr;
+    border-top:1px solid #fcd9c0; border-bottom:1px solid #fcd9c0;
+    background:#fff; margin:6px 0;
+  }
+  .campo { padding:6px 10px; background:#fff; border-right:1px solid #fcd9c0; }
+  .campo:last-child { border-right:none; }
+  .campo-lbl {
+    font-size:8px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.07em; color:#e8630a; margin-bottom:3px;
+  }
+  .campo-val { font-size:10px; color:#1a1917; line-height:1.5; word-break:break-word; white-space:pre-wrap; }
+  .momento-sep { border:none; border-top:1px solid #fcd9c0; margin:0 0 14px; }
+</style>
+</head>
+<body>
+
+<div class="page-top">
+  <div class="logo-txt">CISSAB</div>
+  <div class="page-top-right">
+    <div class="plan-title">Hoja de Planificación</div>
+    <div class="tagline">#MiCorazónLateNaranja</div>
+  </div>
+</div>
+
+<div class="info-grid">
+  <div class="info-cell">
+    <div class="info-lbl">Grupo</div>
+    <div class="info-val">${grupo}</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-lbl">Fecha</div>
+    <div class="info-val">${fecha}</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-lbl">Tema</div>
+    <div class="info-val">${tema}</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-lbl">Contenido</div>
+    <div class="info-val">${contenido}</div>
+  </div>
+  <div class="info-cell full">
+    <div class="info-lbl">Objetivo</div>
+    <div class="info-val">${obj}</div>
+  </div>
+</div>
+
+<div class="hilo-bar">
+  <div class="hilo-line"></div>
+  <div>
+    <div class="hilo-lbl">Hilo conductor</div>
+    <div class="hilo-val">${hilo}</div>
+  </div>
+</div>
+
+<div class="equipo-bar" style="font-size:10px;margin-bottom:10px;background:#ffffff;padding:2px 0;"><b style="text-transform:uppercase;font-size:8px;letter-spacing:.07em;margin-right:6px;color:#333333;">EQUIPO</b> ${equipoHtml}</div>
+
+${momentosHtml}
+
+<script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+function hasSavedData() {
+  try {
+    const mom = localStorage.getItem('cissab_v2_mom');
+    if (!mom) return false;
+    const arr = JSON.parse(mom);
+    return Array.isArray(arr) && arr.length > 0;
+  } catch(e) { return false; }
+}
+
+function showModal() {
+  const hasSaved = hasSavedData();
+  const badge = document.getElementById('savedBadge');
+  const btnC  = document.getElementById('btnContinuar');
+  if (hasSaved) {
+    badge.style.display = 'inline-flex';
+    btnC.classList.remove('disabled');
+  } else {
+    badge.style.display = 'none';
+    btnC.classList.add('disabled');
+  }
+  document.getElementById('startModal').style.display = 'flex';
+  document.getElementById('mainPage').style.display   = 'none';
+}
+
+function continuarPlanificacion() {
+  closeModal();
+  loadAll();
+  // If no group was saved locally, use the user's group
+  if (!selectedGrupos.length && currentUser && currentUser.grupo) {
+    selectedGrupos = [currentUser.grupo];
+    updateMadrijimFromGrupos();
+  }
+  renderGrupoChips();
+  renderTipoActChips();
+  renderTeam();
+  renderAll();
+  setTimeout(autoResizeAll, 100);
+}
+
+function nuevaPlanificacion() {
+  try {
+    ['cissab_v2_mad','cissab_v2_mom','cissab_v2_nid',
+     'cissab_v2_grupo','cissab_v2_fecha','cissab_v2_tema','cissab_v2_contenido',
+     'cissab_v2_objetivo','cissab_v2_hilo'].forEach(k => localStorage.removeItem(k));
+  } catch(e){}
+  madrijim=[]; momentos=[]; nextId=1;
+  // Reset to user's group automatically
+  selectedGrupos = (currentUser && currentUser.grupo && !currentUser.isAdmin) ? [currentUser.grupo] : [];
+  renderGrupoChips();
+  if (selectedGrupos.length) updateMadrijimFromGrupos();
+  selectedTipoAct=''; renderTipoActChips();
+  const jagEl=document.getElementById('jagText');if(jagEl)jagEl.value='';
+  onTipoActChange();
+  ['fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  closeModal();
+  renderTeam();
+  renderAll();
+}
+
+function closeModal() {
+  document.getElementById('startModal').style.display = 'none';
+  document.getElementById('mainPage').style.display   = 'block';
+}
+
+// ── PDF Import (PDF.js, runs fully in browser) ───────
+// PDF.js loaded dynamically via loadPdfjsLib()
+
+function abrirImportModal() {
+  document.getElementById('importOverlay').classList.add('show');
+  const st = document.getElementById('importStatus');
+  st.style.display = 'none';
+  st.className = 'import-status';
+  document.getElementById('pdfInput').value = '';
+}
+
+function cerrarImportModal() {
+  document.getElementById('importOverlay').classList.remove('show');
+}
+
+const importDrop = document.getElementById('importDrop');
+importDrop.addEventListener('dragover',  e => { e.preventDefault(); importDrop.classList.add('dragover'); });
+importDrop.addEventListener('dragleave', () => importDrop.classList.remove('dragover'));
+importDrop.addEventListener('drop', e => {
+  e.preventDefault(); importDrop.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) handlePdfFile(f);
+});
+
+async function loadPdfjsLib() {
+  if (window._pdfjsLib) return window._pdfjsLib;
+  return new Promise((resolve, reject) => {
+    if (window.pdfjsLib) { window._pdfjsLib = window.pdfjsLib; resolve(window.pdfjsLib); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      window._pdfjsLib = window.pdfjsLib;
+      resolve(window.pdfjsLib);
+    };
+    s.onerror = () => reject(new Error('No se pudo cargar PDF.js'));
+    document.head.appendChild(s);
+  });
+}
+
+async function extractPdfText(file) {
+  const pj = await loadPdfjsLib();
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pj.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    let lastY = null;
+    for (const item of tc.items) {
+      if ('str' in item) {
+        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 3) fullText += '\n';
+        fullText += item.str;
+        lastY = item.transform[5];
+      }
+    }
+    fullText += '\n---PAGE---\n';
+  }
+  return fullText;
+}
+
+
+function parsePdfText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const result = { grupo:'', fecha:'', tema:'', contenido:'', objetivo:'', hilo:'', madrijim:[], momentos:[] };
+
+  const GRUPOS = ['Letamid','Leshatef','Meretz','Teshuka','Mejudash','Nitzajon'];
+  const TIPO_MAP = {
+    'RH':'Recibimiento','RECIBIMIENTO':'Recibimiento',
+    'TRASLADO':'Traslado',
+    'JUEGO':'Juego','J1':'Juego','J2':'Juego','J3':'Juego','J4':'Juego','J5':'Juego','J6':'Juego',
+    'MOM':'Juego','MOM 1':'Juego','MOM 2':'Juego','MOM 3':'Juego','MOM 4':'Juego',
+    'MOMENTO 1':'Juego','MOMENTO 2':'Juego','MOMENTO 3':'Juego','MOMENTO 4':'Juego',
+    'MERIENDA':'Merienda',
+    'CIERRE':'Cierre',
+    'POST CIERRE':'Merienda','POST-CIERRE':'Merienda',
+  };
+  const TIPO_WORDS = ['Recibimiento','Traslado','Juego','Merienda','Cierre'];
+
+  // Words that are NEVER names (to avoid creating fake madrijim)
+  const NOT_NAMES = new Set([
+    'todos','todo','todas','grupo','madrij','madrijim','equipo','cissab','juventud',
+    'jot','sol','coordinador','coordinadora','alex','j1','j2','j3','j4','j5','rh',
+    'lunes','martes','miercoles','jueves','viernes','sabado','domingo',
+    'enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre',
+    'juego','cierre','merienda','recibimiento','traslado','nocturna','tarde','manana',
+    'tema','contenido','objetivo','hilo','materiales','lugar','roles','dinamica',
+    'hora','horario','actividad','momento','momentos',
+  ]);
+
+  // ── Header fields ──
+  for (const g of GRUPOS) {
+    if (text.includes(g)) { result.grupo = g; break; }
+  }
+
+  // Date - multiple formats
+  const datePatterns = [
+    /(\d{4}-\d{2}-\d{2})/,
+    /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/,
+    /\bD[ií]a[:\s]+(\d{1,2})[\/-](\d{1,2})\b/i,
+    /FECHA[^:]*[>:\-\s]+(\d[^\n<]{1,20})/i,
+    /\bFECHA\s*>\s*(.+)/i,
+  ];
+  for (const pat of datePatterns) {
+    const m = text.match(pat);
+    if (m) {
+      if (pat.source.includes('FECHA')) {
+        result.fecha = m[1].trim().slice(0,30);
+      } else if (m[3]) {
+        // DD/MM/YYYY
+        const y = m[3].length===2 ? '20'+m[3] : m[3];
+        result.fecha = y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+      } else if (m[2]) {
+        // Dia: DD/M
+        result.fecha = '2025-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+      } else {
+        result.fecha = m[1];
+      }
+      break;
+    }
+  }
+
+  function fa(labels) {
+    for (const label of [].concat(labels)) {
+      for (let i=0;i<lines.length;i++) {
+        const l = lines[i];
+        if (l.toUpperCase().startsWith(label.toUpperCase())) {
+          const rest = l.slice(label.length).replace(/^[\s:>\-\/]+/,'').trim();
+          if (rest && rest.length > 1 && !rest.match(/^[\-=]{3,}/)) return rest;
+          // look at next few lines
+          for (let j=i+1; j<Math.min(i+4,lines.length); j++) {
+            const next = lines[j];
+            if (next.length > 1 && !next.match(/^[\/\->]{1,3}/) && !next.match(/^[\-=]{3,}/)) return next;
+          }
+        }
+      }
+    }
+    return '';
+  }
+
+  result.tema     = fa(['/ TEMA','Tema:','TEMA:','Sábado','Sabado']);
+  result.contenido= fa(['/ CONTENIDO','Contenido:','CONTENIDO:']);
+  result.objetivo = fa(['/ OBJETIVOS','/ OBJETIVO','Objetivo:','OBJETIVO:']);
+  result.hilo     = fa(['/ HILO CONDUCTOR','HC:','Hilo conductor:','HILO CONDUCTOR:']);
+
+  // ── Madrijim: ONLY from explicit team lines ──
+  // Find the line that introduces team members and extract ONLY that
+  const teamPatterns = [
+    /^MADRIJIM\/JOT\s*[>:]\s*(.+)/i,
+    /^MADRIJIM[/\s]*JOT[^:]*:\s*(.+)/i,
+    /^MADRIJIM\s*[>:]\s*(.+)/i,
+    /^EQUIPO\s*[>:]\s*(.+)/i,
+  ];
+  for (const pat of teamPatterns) {
+    for (const line of lines) {
+      const m = line.match(pat);
+      if (m) {
+        const raw = m[1].trim();
+        // Split on comma, "y", spaces — but keep names that are 2-12 chars, capitalized
+        const tokens = raw.split(/[\s,]+/)
+          .map(t => t.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g,'').trim())
+          .filter(t => {
+            if (t.length < 2 || t.length > 14) return false;
+            if (NOT_NAMES.has(t.toLowerCase())) return false;
+            if (/^\d+$/.test(t)) return false;
+            // Must start with uppercase
+            if (!/^[A-ZÁÉÍÓÚÜÑ]/.test(t)) return false;
+            return true;
+          });
+        if (tokens.length > 0 && tokens.length <= 8) {
+          result.madrijim = tokens;
+          break;
+        }
+      }
+    }
+    if (result.madrijim.length) break;
+  }
+
+  // ── Momentos ──
+  let currentMomento = null;
+  let trailingMaterials = []; // materials found outside of momentos (end of doc)
+
+  const SKIP_PREFIXES = [
+    'HORARIO','MOMENTOS','MOMENTO','DESARROLLO','LUGAR','MATERIALES','INTENDENCIA',
+    'ROLES','DINÁMICA','INTERVENCIONES','ACTIVIDAD','MADRIJ ','---PAGE---',
+    'GRUPO','FECHA','TEMA','CONTENIDO','OBJETIVO','HILO','EQUIPO','MADRIJIM',
+    'COORDINADOR','CONVOCATORIA','DURACIÓN','EVALUACIÓN','COMENTARIOS','NOCTURNA',
+    '/ ','>> ','>>>',
+  ];
+
+  function isTipo(line) {
+    const up = line.toUpperCase().replace(/[:\s]+$/,'');
+    if (TIPO_WORDS.includes(line)) return line;
+    if (TIPO_MAP[up]) return TIPO_MAP[up];
+    // numbered: J1:, J2: etc
+    const jMatch = up.match(/^J(\d)\s*[:\s]/);
+    if (jMatch) return 'Juego';
+    const momMatch = up.match(/^(MOM|MOMENTO)\s*(\d)/);
+    if (momMatch) return 'Juego';
+    return null;
+  }
+
+  function shouldSkip(line) {
+    const up = line.toUpperCase();
+    return SKIP_PREFIXES.some(p => up.startsWith(p)) || /^-{5,}/.test(line) || /^={5,}/.test(line);
+  }
+
+  let inMaterialsSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || shouldSkip(line)) continue;
+
+    // Detect a top-level MATERIALES section (not inside a momento)
+    if (/^MATERIAL(ES)?[:\s]*$/i.test(line) && !currentMomento) {
+      inMaterialsSection = true;
+      continue;
+    }
+
+    const tipo = isTipo(line);
+    if (tipo) {
+      inMaterialsSection = false;
+      if (currentMomento) result.momentos.push(currentMomento);
+      currentMomento = {
+        tipo, horaInicio:'', horaCierre:'',
+        desc:'', lugar:'', materiales:[], int:'', intOpen:false, roles:[], din:''
+      };
+      // same-line time
+      const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)].map(m=>m[1]);
+      if (times[0]) currentMomento.horaInicio = times[0];
+      if (times[1]) currentMomento.horaCierre = times[1];
+      continue;
+    }
+
+    // Time only line
+    const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)].map(m=>m[1]);
+    if (times.length && line.replace(/[\d:→\->\s]/g,'').length < 4) {
+      if (currentMomento) {
+        if (!currentMomento.horaInicio) currentMomento.horaInicio = times[0];
+        else if (!currentMomento.horaCierre && times[0] !== currentMomento.horaInicio) currentMomento.horaCierre = times[0];
+        if (times[1]) currentMomento.horaCierre = times[1];
+      }
+      continue;
+    }
+
+    // Material item (bullet)
+    if (/^[·•\-\*]/.test(line) || /^\d+\.\s+[A-Z]/.test(line)) {
+      // Check if it's a "material: person" pattern (table format)
+      const matText = line.replace(/^[·•\-\*\d\.]\s*/,'').trim();
+      if (matText.length < 2) continue;
+
+      if (inMaterialsSection && !currentMomento) {
+        trailingMaterials.push({ text: matText, asignados: [] });
+      } else if (currentMomento) {
+        currentMomento.materiales.push({ text: matText, asignados: [] });
+      }
+      continue;
+    }
+
+    // Table row detection: short line that looks like a person name in madrij column
+    // (already inside a momento, line is a single capitalized word = could be madrij role)
+    // We skip these to avoid creating fake madrijim
+
+    // Description accumulation
+    if (currentMomento && line.length > 3 && !times.length) {
+      if (!currentMomento.desc) currentMomento.desc = line;
+      else if (currentMomento.desc.length < 500) currentMomento.desc += ' ' + line;
+    }
+  }
+
+  if (currentMomento) result.momentos.push(currentMomento);
+
+  // Assign trailing materials to FIRST momento
+  if (trailingMaterials.length > 0 && result.momentos.length > 0) {
+    result.momentos[0].materiales.push(...trailingMaterials);
+  }
+
+  // Clean up: remove momentos with no content
+  result.momentos = result.momentos.filter(m => m.desc || m.materiales.length);
+
+  // Clean tema/contenido from grupo contamination
+  if (result.tema === result.grupo) result.tema = '';
+
+  return result;
+}
+
+async function handlePdfFile(file) {
+  if (!file) return;
+  const status = document.getElementById('importStatus');
+  status.className = 'import-status loading';
+  status.style.display = 'flex';
+  status.innerHTML = '<div class="spinner"></div> Leyendo el PDF...';
+
+  try {
+    // ── Try metadata first (PDFs generated by this app) ──
+    let parsed = null;
+    try {
+      const pj = await loadPdfjsLib();
+      const ab = await file.arrayBuffer();
+      const pdfDoc = await pj.getDocument({ data: ab }).promise;
+      const meta = await pdfDoc.getMetadata();
+      const subject = (meta && meta.info && meta.info.Subject) || '';
+      if (subject && subject.length > 20) {
+        try {
+          const json = JSON.parse(decodeURIComponent(escape(atob(subject))));
+          if (json._v === 2) { parsed = json; }
+        } catch(e) {}
+      }
+    } catch(e) {}
+
+    // ── Fallback: text extraction for old format PDFs ──
+    if (!parsed) {
+      const text = await extractPdfText(file);
+      status.innerHTML = '<div class="spinner"></div> Procesando datos...';
+      parsed = parsePdfText(text);
+    } else {
+      status.innerHTML = '<div class="spinner"></div> Cargando planificación...';
+    }
+
+    // Load header fields
+    const setVal = (id, val) => { if (val) { const el=document.getElementById(id); if(el) el.value=val; } };
+    setVal('grupo', parsed.grupo);
+    setVal('fecha', parsed.fecha);
+    setVal('tema',  parsed.tema);
+    setVal('objetivo', parsed.objetivo);
+    setVal('hilo', parsed.hilo);
+
+    if (parsed.madrijim.length) madrijim = parsed.madrijim;
+
+    if (parsed.momentos.length) {
+      momentos = parsed.momentos.map((m, i) => ({
+        id: i + 1,
+        tipo:       m.tipo || 'Juego',
+        horaInicio: m.horaInicio || '',
+        horaCierre: m.horaCierre || '',
+        desc:       m.desc  || '',
+        lugar:      m.lugar || '',
+        materiales: m.materiales || [],
+        int:        m.int   || '',
+        intOpen:    !!(m.int),
+        roles:      m.roles || [],
+        din:        m.din   || '',
+        addingMat: false, addingRol: false
+      }));
+      nextId = momentos.length + 1;
+    }
+
+    saveAll();
+    renderTeam();
+    renderAll();
+
+    status.className = 'import-status success';
+    status.innerHTML = `✓ Importados ${parsed.momentos.length} momento(s). Revisá y completá los campos si es necesario.`;
+
+    setTimeout(() => {
+      cerrarImportModal();
+      closeModal();
+    }, 1800);
+
+  } catch(err) {
+    console.error(err);
+    status.className = 'import-status error';
+    status.style.display = 'block';
+    status.innerHTML = '✗ No se pudo leer el PDF. Intentá con el archivo original generado por esta herramienta.';
+  }
+}
+
+
+// ── SPEECH RECOGNITION ───────────────────────────
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let activeRecognition = null;
+let activeMicBtn     = null;
+let keepAliveStream  = null;
+
+async function ensureMicReady() {
+  if (keepAliveStream) return true;
+  if (!navigator.mediaDevices) { showToast('Tu navegador no soporta el micrófono'); return false; }
+  try {
+    try {
+      const perm = await navigator.permissions.query({ name: 'microphone' });
+      if (perm.state === 'denied') { showToast('Micrófono bloqueado. Habilitalo en la configuración del navegador.'); return false; }
+    } catch(e) {}
+    keepAliveStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    return true;
+  } catch(e) { showToast('No se pudo acceder al micrófono'); return false; }
+}
+
+async function toggleMic(btn, textareaId, momentoId, field) {
+  if (activeMicBtn === btn) { stopMic(); return; }
+  if (activeRecognition) stopMic();
+  if (!SpeechRecognition) { showToast('Tu navegador no soporta dictado por voz'); return; }
+  const ready = await ensureMicReady();
+  if (!ready) return;
+  const textarea = document.getElementById(textareaId);
+  if (!textarea) return;
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'es-AR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  let baseText = textarea.value;
+  if (baseText && !baseText.endsWith(' ')) baseText += ' ';
+  btn.classList.add('listening');
+  activeMicBtn = btn;
+  activeRecognition = recognition;
+  recognition.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t; else interim += t;
+    }
+    if (final) baseText += final + ' ';
+    textarea.value = baseText + interim;
+    upd(momentoId, field, textarea.value);
+    autoResize(textarea);
+  };
+  recognition.onerror = (e) => {
+    if (e.error !== 'aborted' && e.error !== 'no-speech') showToast('Error: ' + e.error);
+    stopMic();
+  };
+  recognition.onend = () => {
+    if (activeRecognition === recognition && activeMicBtn === btn) {
+      try { recognition.start(); } catch(e) { stopMic(); }
+    }
+  };
+  try { recognition.start(); } catch(e) {
+    showToast('No se pudo iniciar el micrófono');
+    btn.classList.remove('listening'); activeMicBtn = null; activeRecognition = null;
+  }
+}
+
+function stopMic() {
+  if (activeRecognition) { try { activeRecognition.stop(); } catch(e) {} activeRecognition = null; }
+  if (activeMicBtn) { activeMicBtn.classList.remove('listening'); activeMicBtn = null; }
+}
+
+document.addEventListener('click', (e) => {
+  if (activeMicBtn && !e.target.closest('.mic-btn')) stopMic();
+}, true);
+
+// ── Init ──────────────────────────────────────────
+
+['grupo','fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('input',saveAll);
+});
+
+// Init
+if (tryAutoLogin()) {
+  afterLogin();
+} else {
+  document.getElementById('loginOverlay').style.display='flex';
+}
+renderGrupoChips();
+renderTipoActChips();
+</script>
+</body>
+</html>
