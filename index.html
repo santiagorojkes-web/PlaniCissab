@@ -1145,12 +1145,7 @@ function loadAll() {
 }
 
 // ── Group preset ──────────────────────────────────
-function onGrupoChange() {
-  const g=document.getElementById('grupo').value;
-  if(g && GRUPO_MADRIJIM[g]) {
-    madrijim=[...GRUPO_MADRIJIM[g]];
-    renderTeam(); renderAll(); saveAll();
-  }
+function onGrupoChange(){} // legacy stub
 }
 
 // ── Team ──────────────────────────────────────────
@@ -1560,54 +1555,6 @@ ${momentosHtml}
   return pdf.output('blob');
 }
 
-async function ejecutarSubida() {
-  const btn = document.getElementById('btnDrive');
-  const nombreArchivo = getNombreArchivo();
-  const grupo = document.getElementById('grupo').value || 'Sin grupo';
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Generando PDF...';
-
-  let pdfBlob;
-  try { pdfBlob = await generarPdfBlob(); }
-  catch(e) { showToast('Error generando el PDF: ' + e.message); btn.disabled=false; btn.innerHTML='&#9650; Drive'; return; }
-
-  btn.textContent = '⏳ Subiendo a Drive...';
-
-  try {
-    // Buscar subcarpeta del grupo dentro de la carpeta Planificaciones
-    const grupoId = await buscarCarpetaGrupo(grupo);
-
-    // Subir el PDF
-    const metadata = { name: nombreArchivo + '.pdf', parents: [grupoId], mimeType: 'application/pdf' };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', pdfBlob);
-
-    const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${gAccessToken}` },
-      body: form
-    });
-    const data = await resp.json();
-
-    if (data.id) {
-      showToast('✓ "' + nombreArchivo + '" subido a Drive');
-    } else {
-      throw new Error(JSON.stringify(data.error || data));
-    }
-  } catch(e) {
-    if (e.message === 'Token expirado') {
-      gTokenClient.requestAccessToken({ prompt: '' });
-      driveUploadPending = true;
-    } else {
-      showToast('Error al subir: ' + e.message);
-    }
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '&#9650; Drive';
-  }
-}
 
 async function descargarPdf() {
   const btn = document.getElementById('btnPdf');
