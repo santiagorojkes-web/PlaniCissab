@@ -558,6 +558,24 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
   .grupo-chip-btn{padding:6px 12px;font-size:12px;}
 }
 
+
+/* ── TIPO ACTIVIDAD CHIPS ── */
+.tipo-act-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.tipo-act-chip {
+  border:1.5px solid var(--border-strong); background:var(--bg);
+  border-radius:20px; padding:5px 14px; font-size:13px; font-weight:500;
+  font-family:'DM Sans',sans-serif; cursor:pointer; transition:all .15s; white-space:nowrap;
+  color:var(--text-muted);
+}
+.tipo-act-chip:hover { opacity:.85; }
+.tipo-act-chip.active { color:#fff; border-color:transparent; }
+.tipo-act-chip[data-tipo="Actividad Chill"].active        { background:#3b82f6; }
+.tipo-act-chip[data-tipo="Actividad Deportiva"].active    { background:#22c55e; }
+.tipo-act-chip[data-tipo="Actividad General"].active      { background:var(--accent); }
+.tipo-act-chip[data-tipo="Actividad Jaguim"].active       { background:#8b5cf6; }
+.tipo-act-chip[data-tipo="Actividad Picante"].active      { background:#ef4444; }
+.tipo-act-chip[data-tipo="Actividad de Terror"].active    { background:#1f2937; }
+
 </style>
 </head>
 <body>
@@ -685,28 +703,20 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
       <div class="field-label">Fecha</div>
       <input class="field-input" type="date" id="fecha"/>
     </div>
-    <div class="info-cell" style="grid-column:span 2;border-right:none;">
-      <div class="field-label">Tipo de actividad</div>
-      <select class="field-input tipo-act-select" id="tipoActividad" onchange="onTipoActChange()">
-        <option value="">Elegir tipo...</option>
-        <option value="Actividad Chill">Actividad Chill</option>
-        <option value="Actividad Deportiva">Actividad Deportiva</option>
-        <option value="Actividad General">Actividad General</option>
-        <option value="Actividad Jaguim">Actividad Jaguim</option>
-        <option value="Actividad Picante">Actividad Picante</option>
-        <option value="Actividad de Terror">Actividad de Terror</option>
-      </select>
-      <div class="jag-wrap" id="jagWrap">
-        <input class="jag-input" type="text" id="jagText" placeholder="Insertar Jag..." oninput="saveAll()"/>
-      </div>
-    </div>
     <div class="info-cell">
       <div class="field-label">Tema</div>
       <input class="field-input" type="text" id="tema" placeholder="¿De qué trata hoy?"/>
     </div>
-    <div class="info-cell" style="grid-column:span 2;border-right:none;">
+    <div class="info-cell" style="border-right:none;">
       <div class="field-label">Contenido</div>
       <input class="field-input" type="text" id="contenido" placeholder="¿Qué queremos transmitir?"/>
+    </div>
+    <div class="info-cell" style="grid-column:span 3;border-right:none;">
+      <div class="field-label">Tipo de actividad</div>
+      <div class="tipo-act-chips" id="tipoActChips"></div>
+      <div class="jag-wrap" id="jagWrap">
+        <input class="jag-input" type="text" id="jagText" placeholder="Insertar Jag..." oninput="saveAll()"/>
+      </div>
     </div>
   </div>
   <div class="info-cell full">
@@ -755,6 +765,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 
 <div class="bottom-bar">
   <button class="btn" onclick="showModal()" title="Volver al inicio" style="border-color:var(--border-strong);color:var(--text-muted);">&#8592; Inicio</button>
+  <button class="btn" onclick="logout()" title="Cerrar sesión" style="color:var(--text-faint);font-size:11px;">⏏ Salir</button>
   <button class="btn" onclick="abrirImportModal()" title="Importar una planificación desde PDF">&#128196; Importar PDF</button>
   <button class="btn" onclick="descargarPdf()" id="btnPdf">&#128438; Guardar PDF</button>
   <button class="btn drive-btn" onclick="subirADrive()" id="btnDrive" style="display:flex;align-items:center;gap:7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="18" height="16" aria-hidden="true" style="flex-shrink:0;display:inline-block;vertical-align:middle;">
@@ -789,6 +800,19 @@ const USERS = [
 ];
 let currentUser = null;
 
+
+function logout() {
+  localStorage.removeItem('cissab_session');
+  currentUser = null;
+  gAccessToken = null;
+  gTokenClient = null;
+  document.getElementById('mainPage').style.display='none';
+  document.getElementById('startModal').style.display='none';
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').textContent='';
+}
 function doLogin() {
   const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
   const pw    = (document.getElementById('loginPass').value||'').trim();
@@ -874,15 +898,13 @@ function getGrupoNombre(){
 // ══════════════════════════════════════════════════════
 // TIPO ACTIVIDAD
 // ══════════════════════════════════════════════════════
-function onTipoActChange(){
-  const val=(document.getElementById('tipoActividad')||{}).value||'';
+).value||'';
   const jw=document.getElementById('jagWrap');
   if(jw)jw.classList.toggle('visible',val==='Actividad Jaguim');
   saveAll();
 }
-function getTipoActShort(){
-  const map={'Actividad Chill':'Chill','Actividad Deportiva':'Deportiva','Actividad General':'General','Actividad Jaguim':'Jag','Actividad Picante':'Picante','Actividad de Terror':'Terror'};
-  return map[(document.getElementById('tipoActividad')||{}).value||'']||'';
+;
+  return map[selectedTipoAct||'']||'';
 }
 
 // ══════════════════════════════════════════════════════
@@ -902,6 +924,37 @@ function getNombreArchivo(){
 // ══════════════════════════════════════════════════════
 // DRIVE ACTIVITY FOLDERS & FOLDER SELECTOR
 // ══════════════════════════════════════════════════════
+
+const TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad General','Actividad Jaguim','Actividad Picante','Actividad de Terror'];
+let selectedTipoAct = '';
+
+function renderTipoActChips() {
+  const c = document.getElementById('tipoActChips'); if(!c) return;
+  c.innerHTML = TIPOS_ACT.map(t =>
+    `<button class="tipo-act-chip${selectedTipoAct===t?' active':''}" data-tipo="${t}" onclick="selectTipoAct('${t}')">${t}</button>`
+  ).join('');
+}
+
+function selectTipoAct(t) {
+  selectedTipoAct = selectedTipoAct === t ? '' : t;
+  renderTipoActChips();
+  const jw = document.getElementById('jagWrap');
+  if(jw) jw.classList.toggle('visible', selectedTipoAct === 'Actividad Jaguim');
+  // If General selected, auto-set grupo to General
+  if(selectedTipoAct === 'Actividad General' && selectedGrupos[0] !== 'General') {
+    // just save, don't force grupo
+  }
+  saveAll();
+}
+
+function getTipoActShort() {
+  const map = {'Actividad Chill':'Chill','Actividad Deportiva':'Deportiva','Actividad General':'General','Actividad Jaguim':'Jag','Actividad Picante':'Picante','Actividad de Terror':'Terror'};
+  return map[selectedTipoAct] || '';
+}
+
+// Keep onTipoActChange as no-op for compat
+function onTipoActChange() {}
+
 const ACTIVITY_FOLDERS=['Actividades Chill','Actividades Deportivas','Actividades Generales','Actividades Jaguim','Actividades Picantes','Actividades de Terror'];
 const ACTIVITY_FOLDER_MAP={'Actividad Chill':'Actividades Chill','Actividad Deportiva':'Actividades Deportivas','Actividad General':'Actividades Generales','Actividad Jaguim':'Actividades Jaguim','Actividad Picante':'Actividades Picantes','Actividad de Terror':'Actividades de Terror'};
 let driveRootFolders={};
@@ -935,12 +988,13 @@ async function ejecutarSubida(){
 
 function abrirDriveFolderModal(){
   const body=document.getElementById('dfmBody');
-  const tipoAct=(document.getElementById('tipoActividad')||{}).value||'';
+  const tipoAct=selectedTipoAct||'';
   const actFolder=ACTIVITY_FOLDER_MAP[tipoAct]||'';
   const pre=new Set();
   selectedGrupos.forEach(g=>{if(g!=='General')pre.add(g.toLowerCase());});
   if(selectedGrupos[0]==='General')pre.add('actividades generales');
   if(actFolder)pre.add(actFolder.toLowerCase());
+  // Admins: no pre-selection (they can pick manually)
   const allNames=Object.keys(driveRootFolders);
   const grpF=ALL_GRUPOS.filter(g=>allNames.includes(g.toLowerCase()));
   const actF=ACTIVITY_FOLDERS.filter(af=>allNames.includes(af.toLowerCase()));
@@ -1041,9 +1095,18 @@ function applySyncData(data){
   if(!data||!data._sync)return;
   if(data.selectedGrupos){selectedGrupos=data.selectedGrupos;renderGrupoChips();}
   if(data.madrijim){madrijim=data.madrijim;renderTeam();}
-  if(data.momentos){momentos=data.momentos;nextId=Math.max(0,...momentos.map(m=>m.id||0))+1;renderAll();}
-  if(data.fields)Object.entries(data.fields).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.value=val||'';});
-  onTipoActChange();
+  if(data.momentos){
+    momentos=data.momentos.map((m,i)=>({
+      ...m, id:i+1,
+      materiales:(m.materiales||[]).map(it=>({text:it.text||it,asignados:[]})),
+      roles:(m.roles||[]).map(it=>({text:it.text||it,asignados:[]}))
+    }));
+    nextId=momentos.length+1;renderAll();
+  }
+  if(data.fields){
+    Object.entries(data.fields).forEach(([id,val])=>{if(id==='tipoActividad'||id==='selectedTipoAct')return;const el=document.getElementById(id);if(el)el.value=val||'';});
+    if(data.fields.tipoActividad){selectedTipoAct=data.fields.tipoActividad;renderTipoActChips();}
+  }
 }
 
 const GRUPO_MADRIJIM = {
@@ -1069,7 +1132,7 @@ function saveAll() {
       localStorage.setItem('cissab_v2_'+id, document.getElementById(id).value||'');
     });
     localStorage.setItem('cissab_v2_selectedGrupos', JSON.stringify(selectedGrupos));
-    localStorage.setItem('cissab_v2_tipoActividad', (document.getElementById('tipoActividad')||{}).value||'');
+    localStorage.setItem('cissab_v2_tipoActividad', selectedTipoAct||'');
     localStorage.setItem('cissab_v2_jagText', (document.getElementById('jagText')||{}).value||'');
   } catch(e){}
 }
@@ -1239,8 +1302,9 @@ function renderItems(m,lista){
 // ▶ CONFIGURACIÓN
 const GDRIVE_CLIENT_ID = '102705327045-hh3h2drnhphfccbjg9g8fm6kf2agq6ei.apps.googleusercontent.com';
 
-// Emails autorizados para subir al Drive (uno por grupo)
-// Modificar con los emails reales de cada grupo
+// Emails autorizados para subir al Drive
+// IMPORTANTE: en Google Cloud Console > Credenciales, agregar:
+//   https://plani-cissab.vercel.app como origen JS autorizado
 const AUTHORIZED_EMAILS = [
   'cissabmeretz@gmail.com',
   'leshatef.cissab@gmail.com',
@@ -1289,6 +1353,8 @@ function iniciarGoogleAuth() {
           }
         } catch(e) {}
         gAccessToken = resp.access_token;
+        // Create activity folders eagerly
+        ensureActivityFolders().catch(()=>{});
         if (driveUploadPending) { driveUploadPending = false; await ejecutarSubida(); }
       }
     });
@@ -1328,7 +1394,7 @@ async function buscarCarpetaGrupo(nombreGrupo) {
 
 async function generarPdfBlob() {
   // Generamos el mismo HTML que en la vista de impresión
-  const grupo   = document.getElementById('grupo').value    || '';
+  const grupo   = getGrupoNombre();
   const fecha   = document.getElementById('fecha').value    || '';
   const tema    = document.getElementById('tema').value     || '';
   const contenido = document.getElementById('contenido').value || '';
@@ -1461,7 +1527,7 @@ ${momentosHtml}
   // Embed planning data as PDF metadata for reliable re-import
   const planData = {
     _v: 2, // version marker so we know it's our format
-    grupo:    document.getElementById('grupo').value    || '',
+    grupo:    getGrupoNombre(),
     fecha:    document.getElementById('fecha').value    || '',
     tema:     document.getElementById('tema').value     || '',
     contenido:document.getElementById('contenido').value|| '',
@@ -1696,7 +1762,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
 function guardar(){saveAll();showToast('✓ Planificación guardada');syncToDrive().catch(()=>{});}
 function abrirVistaImpresion() {
-  const grupo     = document.getElementById('grupo').value    || '';
+  const grupo     = getGrupoNombre();
   const fecha     = document.getElementById('fecha').value    || '';
   const tema      = document.getElementById('tema').value     || '';
   const contenido = document.getElementById('contenido').value|| '';
@@ -1928,6 +1994,7 @@ function continuarPlanificacion() {
     updateMadrijimFromGrupos();
   }
   renderGrupoChips();
+  renderTipoActChips();
   renderTeam();
   renderAll();
   setTimeout(autoResizeAll, 100);
@@ -1944,7 +2011,7 @@ function nuevaPlanificacion() {
   selectedGrupos = (currentUser && currentUser.grupo && !currentUser.isAdmin) ? [currentUser.grupo] : [];
   renderGrupoChips();
   if (selectedGrupos.length) updateMadrijimFromGrupos();
-  const taEl=document.getElementById('tipoActividad');if(taEl)taEl.value='';
+  selectedTipoAct=''; renderTipoActChips();
   const jagEl=document.getElementById('jagText');if(jagEl)jagEl.value='';
   onTipoActChange();
   ['fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
@@ -2414,6 +2481,7 @@ if (tryAutoLogin()) {
   document.getElementById('loginOverlay').style.display='flex';
 }
 renderGrupoChips();
+renderTipoActChips();
 </script>
 </body>
 </html>
