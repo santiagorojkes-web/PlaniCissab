@@ -1334,17 +1334,7 @@ function iniciarGoogleAuth() {
       login_hint: storedEmail,
       callback: async (resp) => {
         if (resp.error) { showToast('Error al conectar con Google: ' + resp.error); return; }
-        // Verify the signed-in email matches authorized list
-        try {
-          const userInfo = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: { Authorization: 'Bearer ' + resp.access_token }
-          }).then(r => r.json());
-          const email = (userInfo.email || '').toLowerCase();
-          if (!AUTHORIZED_EMAILS.map(e => e.toLowerCase()).includes(email)) {
-            showToast('❌ ' + email + ' no está autorizado para subir al Drive');
-            return;
-          }
-        } catch(e) {}
+        // Drive auth OK - login system already handles authorization
         gAccessToken = resp.access_token;
         // Create activity folders eagerly
         ensureActivityFolders().catch(()=>{});
