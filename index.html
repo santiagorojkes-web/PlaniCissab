@@ -616,6 +616,14 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .shift-btn.active-nocturna { background:#1e1b4b; color:#e0e7ff; }
 @media(max-width:768px){ .shift-btn{padding:7px 14px;font-size:12px;} }
 
+
+.coord-comments { margin-top:8px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:4px; padding:8px 10px; }
+.coord-comments-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:6px; }
+.coord-comment-item { display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#78350f; margin-bottom:4px; line-height:1.4; }
+.coord-comment-item span { flex:1; }
+.coord-comment-done { background:#16a34a; color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.coord-comment-done:hover { background:#15803d; }
+
 </style>
 </head>
 <body>
@@ -632,7 +640,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
     <div class="login-sub">Ingresá con el mail de tu grupo</div>
     <div class="login-field">
       <label>Área</label>
-      <select class="login-input" id="loginArea" style="cursor:pointer;">
+      <select class="login-input" id="loginArea" style="cursor:pointer;" onchange="window._currentArea=this.value;">
         <option value="">Seleccioná un área...</option>
         <option value="EDMA">EDMA</option>
         <option value="Moadon">Moadon</option>
@@ -895,15 +903,32 @@ function tryAutoLogin() {
     const user = USERS.find(u=>u.email.toLowerCase()===email.toLowerCase()&&u.pw===pw);
     if (!user) { localStorage.removeItem('cissab_session'); return false; }
     currentUser = user;
-    window._currentArea = area || '';
+    window._currentArea = saved.area || 'Moadon';
     return true;
   } catch(e) { return false; }
 }
 
 function afterLogin() {
   document.getElementById('loginOverlay').style.display='none';
+  // 1. Apply cached config instantly (no network)
+  loadCachedConfig();
+  // 2. Fetch fresh config from Drive in background (API Key, no OAuth)
+  loadConfigPublic().then(() => {
+    // Re-apply group selection after config refreshes
+    if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
+      if (ALL_GRUPOS.includes(currentUser.grupo) && !selectedGrupos.length) {
+        selectedGrupos=[currentUser.grupo];
+        renderGrupoChips();
+        updateMadrijimFromGrupos();
+      }
+    }
+  }).catch(()=>{});
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
-    selectedGrupos=[currentUser.grupo];
+    if (ALL_GRUPOS.includes(currentUser.grupo)) {
+      selectedGrupos=[currentUser.grupo];
+    } else if (ALL_GRUPOS.length > 0) {
+      selectedGrupos=[];
+    }
     renderGrupoChips();
     updateMadrijimFromGrupos();
   }
@@ -913,7 +938,7 @@ function afterLogin() {
 // ══════════════════════════════════════════════════════
 // MULTI-GROUP
 // ══════════════════════════════════════════════════════
-const ALL_GRUPOS=['Letamid','Leshatef','Meretz','Teshuka','Mejudash','Nitzajon'];
+let ALL_GRUPOS=['Letamid','Leshatef','Meretz','Teshuka','Mejudash','Nitzajon'];
 let selectedGrupos=[];
 
 function renderGrupoChips() {
@@ -983,7 +1008,10 @@ function getNombreArchivo(){
     const _s=currentShift==='tarde'?'Tarde':'Nocturna';
     return[grupo,(jt.trim()||'Jag'),fechaStr,_s].filter(Boolean).join(' ');
   }
-  const shiftSuffix = currentShift === 'tarde' ? 'Tarde' : 'Nocturna';
+  const _tc = window._turnoConfig;
+  const shiftSuffix = currentShift === 'tarde'
+    ? (_tc && _tc.t1 ? _tc.t1 : 'Tarde')
+    : (_tc && _tc.t2 ? _tc.t2 : 'Nocturna');
   return[grupo,tipoShort,fechaStr,shiftSuffix].filter(Boolean).join(' ');
 }
 
@@ -991,7 +1019,7 @@ function getNombreArchivo(){
 // DRIVE ACTIVITY FOLDERS & FOLDER SELECTOR
 // ══════════════════════════════════════════════════════
 
-const TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad Jaguim','Actividad Picante','Actividad de Terror'];
+let TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad Jaguim','Actividad Picante','Actividad de Terror'];
 let selectedTipoAct = '';
 
 function renderTipoActChips() {
@@ -1169,16 +1197,26 @@ async function confirmarSubidaDrive(){
 }
 
 async function deleteSyncFiles(uploadedFolderNames) {
-  // Only delete from GROUP folders (not activity folders)
   const groupNames = uploadedFolderNames.filter(n => ALL_GRUPOS.map(g=>g.toLowerCase()).includes(n.toLowerCase()));
   for (const name of groupNames) {
     try {
       const fid = driveRootFolders[name.toLowerCase()];
       if (!fid) continue;
-      const q = `name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
-      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
-      for (const file of (s.files||[])) {
+      // Delete sync file
+      const q1 = `name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
+      const s1 = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q1)}&fields=files(id)`);
+      for (const file of (s1.files||[])) {
         await driveApi(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE' });
+      }
+      // Also delete any "(con comentarios)" version of this planificacion
+      const baseName = pendingName || '';
+      if (baseName) {
+        const comentName = baseName + ' (con comentarios).pdf';
+        const q2 = `name='${comentName}' and trashed=false`;
+        const s2 = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q2)}&fields=files(id)`);
+        for (const file of (s2.files||[])) {
+          await driveApi(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE' });
+        }
       }
     } catch(e) {}
   }
@@ -1280,7 +1318,7 @@ const GRUPO_MADRIJIM = {
   Nitzajon:['Solchu','Ezi','Martu'],
   Mejudash:['Valencha','Aieka','Juli'],
 };
-const TIPOS = ['Recibimiento','Traslado','Juego','Merienda','Cierre','Personalizado'];
+let TIPOS = ['Recibimiento','Traslado','Juego','Merienda','Cierre','Personalizado'];
 
 let madrijim=[], momentos=[], nextId=1;
 let dragSrcId=null;
@@ -1462,6 +1500,10 @@ function renderItems(m,lista){
 // ▶ CONFIGURACIÓN
 const GDRIVE_CLIENT_ID = '102705327045-hh3h2drnhphfccbjg9g8fm6kf2agq6ei.apps.googleusercontent.com';
 
+// ▼ API Key de solo lectura para cargar configuraciones sin OAuth
+// Crear en console.cloud.google.com → APIs & Services → Credentials → API Key
+const DRIVE_API_KEY = 'AIzaSyBnSuPaE-Q0eU7pot3VrsUfnZZt_yowq_I';
+
 // Emails autorizados para subir al Drive
 // IMPORTANTE: en Google Cloud Console > Credenciales, agregar:
 //   https://plani-cissab.vercel.app como origen JS autorizado
@@ -1483,9 +1525,8 @@ const CARPETA_RAIZ_ID = '1hiLmTa_gwzq39fmbUadm8utnhL-XiUme';
 let carpetaAreaId = null;
 
 async function initAreaFolder() {
-  if (carpetaAreaId) return; // ya encontrada
-  // Por ahora siempre Moadon — el backend lo hará configurable por área
-  const areaNombre = 'Moadon';
+  if (carpetaAreaId) return;
+  const areaNombre = window._currentArea || 'Moadon';
   const q = `name='${areaNombre}' and '${CARPETA_RAIZ_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
   if (r.files && r.files.length > 0) {
@@ -1519,6 +1560,8 @@ function iniciarGoogleAuth() {
         if (resp.error) { showToast('Error al conectar con Google: ' + resp.error); return; }
         // Drive auth OK - login system already handles authorization
         gAccessToken = resp.access_token;
+        // Load area config from Drive (updates groups, activities, etc.)
+        loadConfigFromDrive().catch(()=>{});
         // Create activity folders eagerly
         ensureActivityFolders().catch(()=>{});
         if (window._pendingSync) {
@@ -1860,6 +1903,15 @@ function renderAll(){
   <line x1="4.5" y1="15.5" x2="9.5" y2="15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
 </svg></button>
         </div>
+        ${(m._comentarios&&m._comentarios.length)?`
+        <div class="coord-comments">
+          <div class="coord-comments-label">💬 Comentarios del coordinador</div>
+          ${(m._comentarios||[]).map((c,ci)=>`
+            <div class="coord-comment-item">
+              <span>${esc(c)}</span>
+              <button class="coord-comment-done" onclick="marcarComentario(${m.id},${ci})" title="Marcar como resuelto">✓</button>
+            </div>`).join('')}
+        </div>`:''}
       </div>
 
       <div class="mcell">
@@ -2520,10 +2572,11 @@ async function handlePdfFile(file) {
         horaCierre: m.horaCierre || '',
         desc:       m.desc  || '',
         lugar:      m.lugar || '',
-        materiales: m.materiales || [],
+        materiales: (m.materiales||[]).map(it=>({text:it.text||String(it)||'',asignados:[]})),
         int:        m.int   || '',
         intOpen:    !!(m.int),
-        roles:      m.roles || [],
+        _comentarios: m._comentarios || [],
+        roles:      (m.roles||[]).map(it=>({text:it.text||String(it)||'',asignados:[]})),
         din:        m.din   || '',
         addingMat: false, addingRol: false
       }));
@@ -2713,6 +2766,132 @@ function loadShiftsFromStorage() {
     if(s) planStates = JSON.parse(s);
     if(cs) currentShift = cs;
   } catch(e) {}
+}
+
+
+function marcarComentario(momentoId, commentIdx) {
+  const m = momentos.find(x => x.id === momentoId);
+  if (!m || !m._comentarios) return;
+  m._comentarios.splice(commentIdx, 1);
+  if (!m._comentarios.length) delete m._comentarios;
+  renderAll(); saveAll();
+}
+
+// ══════════════════════════════════════════════════════
+// AREA CONFIG — load from Drive and apply to UI
+// ══════════════════════════════════════════════════════
+
+function applyAreaConfig(cfg) {
+  if (!cfg) return;
+
+  // Groups + madrijim
+  if (cfg.grupos && Object.keys(cfg.grupos).length > 0) {
+    Object.keys(GRUPO_MADRIJIM).forEach(k => delete GRUPO_MADRIJIM[k]);
+    Object.assign(GRUPO_MADRIJIM, cfg.grupos);
+    ALL_GRUPOS = Object.keys(cfg.grupos);
+    renderGrupoChips();
+    if (selectedGrupos.length) updateMadrijimFromGrupos();
+  }
+
+  // Activity types
+  if (cfg.tiposActividad && cfg.tiposActividad.length > 0) {
+    TIPOS_ACT = cfg.tiposActividad.map(a => a.nombre);
+    if (!TIPOS_ACT.includes(selectedTipoAct)) selectedTipoAct = '';
+    renderTipoActChips();
+    // Update ACTIVITY_FOLDER_MAP
+    cfg.tiposActividad.forEach(a => {
+      if (a.carpeta) ACTIVITY_FOLDER_MAP[a.nombre] = a.carpeta;
+    });
+  }
+
+  // Momento types
+  if (cfg.tiposMomento && cfg.tiposMomento.length > 0) {
+    TIPOS = [...cfg.tiposMomento, 'Personalizado'];
+    renderAll(); // refresh dropdowns
+  }
+
+  // Shift labels
+  if (cfg.turnos) updateShiftLabels(cfg.turnos);
+
+  window._areaConfig = cfg;
+}
+
+function updateShiftLabels(turnos) {
+  if (!turnos) return;
+  window._turnoConfig = turnos;
+  const btn1 = document.getElementById('btnTarde');
+  const btn2 = document.getElementById('btnNocturna');
+  const t1Icon = '☀ ', t2Icon = '🌙 ';
+  if (btn1) btn1.textContent = t1Icon + (turnos.t1 || 'Tarde');
+  if (btn2) {
+    btn2.textContent = t2Icon + (turnos.t2 || 'Nocturna');
+    btn2.style.display = turnos.t2activo === false ? 'none' : '';
+  }
+  updateShiftUI();
+}
+
+async function loadConfigFromDrive() {
+  if (!gAccessToken) return;
+  try {
+    await initAreaFolder();
+    if (!carpetaAreaId) return;
+    const q = `name='_config.json' and '${carpetaAreaId}' in parents and trashed=false`;
+    const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+    if (!r.files || !r.files.length) return;
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${r.files[0].id}?alt=media`, {
+      headers: { Authorization: `Bearer ${gAccessToken}` }
+    });
+    const cfg = await resp.json();
+    applyAreaConfig(cfg);
+    const area = window._currentArea || 'Moadon';
+    localStorage.setItem('cissab_area_config_' + area, JSON.stringify(cfg));
+    showToast('✓ Configuración del área actualizada');
+  } catch(e) {}
+}
+
+function loadCachedConfig() {
+  const area = window._currentArea || 'Moadon';
+  try {
+    const cached = localStorage.getItem('cissab_area_config_' + area);
+    if (cached) applyAreaConfig(JSON.parse(cached));
+  } catch(e) {}
+}
+
+async function loadConfigPublic() {
+  // Load area config using API Key — no OAuth needed, works on first visit
+  if (!DRIVE_API_KEY) return;
+  const area = window._currentArea || 'Moadon';
+  try {
+    // Step 1: find area folder inside Planificaciones
+    const q1 = `name='${area}' and '${CARPETA_RAIZ_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const r1 = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q1)}&fields=files(id)&key=${DRIVE_API_KEY}`
+    ).then(r => r.json());
+    if (!r1.files || !r1.files.length) return;
+    const areaFolderId = r1.files[0].id;
+
+    // Step 2: find _config.json inside area folder
+    const q2 = `name='_config.json' and '${areaFolderId}' in parents and trashed=false`;
+    const r2 = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q2)}&fields=files(id,modifiedTime)&key=${DRIVE_API_KEY}`
+    ).then(r => r.json());
+    if (!r2.files || !r2.files.length) return;
+
+    // Skip if cached version is newer or same
+    const fileId = r2.files[0].id;
+    const remoteTs = r2.files[0].modifiedTime;
+    const cacheKey = 'cissab_area_config_ts_' + area;
+    if (localStorage.getItem(cacheKey) === remoteTs) return; // already up to date
+
+    // Step 3: download the config file (must be publicly shared by backend)
+    const cfg = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${DRIVE_API_KEY}`
+    ).then(r => r.json());
+
+    applyAreaConfig(cfg);
+    localStorage.setItem('cissab_area_config_' + area, JSON.stringify(cfg));
+    localStorage.setItem(cacheKey, remoteTs);
+  } catch(e) { /* fail silently - app works with cached config */ }
 }
 
 // ── Init ──────────────────────────────────────────
