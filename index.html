@@ -603,6 +603,19 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
   pointer-events:none;
 }
 
+
+/* ── TARDE / NOCTURNA TOGGLE ── */
+.shift-toggle { display:flex; gap:0; border-radius:10px; overflow:hidden; border:1.5px solid var(--border-strong); width:fit-content; }
+.shift-btn {
+  padding:7px 20px; font-size:13px; font-weight:600;
+  font-family:'DM Sans',sans-serif; border:none; background:var(--surface);
+  color:var(--text-muted); cursor:pointer; transition:all .15s;
+}
+.shift-btn:first-child { border-right:1.5px solid var(--border-strong); }
+.shift-btn.active-tarde  { background:#dbeafe; color:#1e3a5f; }
+.shift-btn.active-nocturna { background:#1e1b4b; color:#e0e7ff; }
+@media(max-width:768px){ .shift-btn{padding:7px 14px;font-size:12px;} }
+
 </style>
 </head>
 <body>
@@ -617,6 +630,17 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
     </div>
     <div class="login-title">Bienvenido a PlanniCissab</div>
     <div class="login-sub">Ingresá con el mail de tu grupo</div>
+    <div class="login-field">
+      <label>Área</label>
+      <select class="login-input" id="loginArea" style="cursor:pointer;">
+        <option value="">Seleccioná un área...</option>
+        <option value="EDMA">EDMA</option>
+        <option value="Moadon">Moadon</option>
+        <option value="Bogrim Mayor">Bogrim Mayor</option>
+        <option value="Bogrim Menor">Bogrim Menor</option>
+        <option value="Shorashim">Shorashim</option>
+      </select>
+    </div>
     <div class="login-field">
       <label>Mail</label>
       <input class="login-input" type="email" id="loginEmail" placeholder="mail@grupo.com" autocomplete="email"/>
@@ -720,6 +744,13 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
   </div>
 </div>
 
+<div style="padding:0 20px 10px;display:flex;align-items:center;gap:12px;">
+  <div class="shift-toggle">
+    <button class="shift-btn active-tarde" id="btnTarde" onclick="switchShift('tarde')">☀ Tarde</button>
+    <button class="shift-btn" id="btnNocturna" onclick="switchShift('nocturna')">🌙 Nocturna</button>
+  </div>
+  <span id="shiftLabel" style="font-size:12px;color:var(--text-muted);font-style:italic;"></span>
+</div>
 <div class="info-card">
   <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;">
     <div class="info-cell" style="grid-column:span 3;border-right:none;border-bottom:1px solid var(--border);">
@@ -848,8 +879,10 @@ function doLogin() {
   if (!user) { err.textContent='Mail o contraseña incorrectos.'; return; }
   err.textContent='';
   currentUser = user;
+  const area = (document.getElementById('loginArea')||{}).value || '';
   if (document.getElementById('loginRemember').checked)
-    localStorage.setItem('cissab_session', JSON.stringify({email:user.email,pw:user.pw}));
+    localStorage.setItem('cissab_session', JSON.stringify({email:user.email,pw:user.pw,area}));
+  window._currentArea = area;
   afterLogin();
 }
 
@@ -857,10 +890,11 @@ function tryAutoLogin() {
   try {
     const saved = localStorage.getItem('cissab_session');
     if (!saved) return false;
-    const {email,pw} = JSON.parse(saved);
+    const {email,pw,area} = JSON.parse(saved);
     const user = USERS.find(u=>u.email.toLowerCase()===email.toLowerCase()&&u.pw===pw);
     if (!user) { localStorage.removeItem('cissab_session'); return false; }
     currentUser = user;
+    window._currentArea = area || '';
     return true;
   } catch(e) { return false; }
 }
@@ -941,12 +975,15 @@ function getNombreArchivo(){
   if(fecha){const d=new Date(fecha+'T12:00:00');fechaStr=d.getDate()+'-'+(d.getMonth()+1);}
   const grupo=getGrupoNombre();
   const tipoShort=getTipoActShort();
-  if(selectedGrupos[0]==='General')return('General '+fechaStr).trim();
+  const _sfx = currentShift==='tarde'?'Tarde':'Nocturna';
+  if(selectedGrupos[0]==='General')return ['General',fechaStr,_sfx].filter(Boolean).join(' ');
   if(tipoShort==='Jag'){
     const jt=(document.getElementById('jagText')||{}).value||'';
-    return(grupo+' '+(jt.trim()||'Jag')+' '+fechaStr).trim();
+    const _s=currentShift==='tarde'?'Tarde':'Nocturna';
+    return[grupo,(jt.trim()||'Jag'),fechaStr,_s].filter(Boolean).join(' ');
   }
-  return[grupo,tipoShort,fechaStr].filter(Boolean).join(' ');
+  const shiftSuffix = currentShift === 'tarde' ? 'Tarde' : 'Nocturna';
+  return[grupo,tipoShort,fechaStr,shiftSuffix].filter(Boolean).join(' ');
 }
 
 // ══════════════════════════════════════════════════════
@@ -1251,6 +1288,9 @@ function saveAll() {
     localStorage.setItem('cissab_v2_selectedGrupos', JSON.stringify(selectedGrupos));
     localStorage.setItem('cissab_v2_tipoActividad', selectedTipoAct||'');
     localStorage.setItem('cissab_v2_jagText', (document.getElementById('jagText')||{}).value||'');
+    // Also save current shift state
+    captureCurrentPlan();
+    saveShiftsToStorage();
   } catch(e){}
 }
 function loadAll() {
@@ -2063,16 +2103,16 @@ function showModal() {
 
 function continuarPlanificacion() {
   closeModal();
-  loadAll();
-  // If no group was saved locally, use the user's group
+  loadShiftsFromStorage();
+  applyPlanState(planStates[currentShift]);
+  updateShiftUI();
+  // If no group was saved, use the user's group
   if (!selectedGrupos.length && currentUser && currentUser.grupo) {
     selectedGrupos = [currentUser.grupo];
     updateMadrijimFromGrupos();
   }
   renderGrupoChips();
   renderTipoActChips();
-  renderTeam();
-  renderAll();
   setTimeout(autoResizeAll, 100);
 }
 
@@ -2082,14 +2122,17 @@ function nuevaPlanificacion() {
      'cissab_v2_grupo','cissab_v2_fecha','cissab_v2_tema','cissab_v2_contenido',
      'cissab_v2_objetivo','cissab_v2_hilo'].forEach(k => localStorage.removeItem(k));
   } catch(e){}
+  // Reset both plans
+  planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState() };
+  currentShift = 'tarde';
   madrijim=[]; momentos=[]; nextId=1;
-  // Reset to user's group automatically
   selectedGrupos = (currentUser && currentUser.grupo && !currentUser.isAdmin) ? [currentUser.grupo] : [];
   renderGrupoChips();
   if (selectedGrupos.length) updateMadrijimFromGrupos();
   selectedTipoAct=''; renderTipoActChips();
   const jagEl=document.getElementById('jagText');if(jagEl)jagEl.value='';
   onTipoActChange();
+  updateShiftUI();
   ['fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -2543,6 +2586,95 @@ document.addEventListener('click', (e) => {
   if (activeMicBtn && !e.target.closest('.mic-btn')) stopMic();
 }, true);
 
+
+// ══════════════════════════════════════════════════════
+// TARDE / NOCTURNA TWO-PLAN SYSTEM
+// ══════════════════════════════════════════════════════
+let currentShift = 'tarde'; // 'tarde' or 'nocturna'
+
+// Each plan stores its own complete state
+const emptyPlanState = () => ({
+  madrijim: [], momentos: [], nextId: 1,
+  selectedGrupos: [], selectedTipoAct: '', jagText: '',
+  fecha:'', tema:'', contenido:'', objetivo:'', hilo:''
+});
+let planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState() };
+
+function captureCurrentPlan() {
+  const state = {
+    madrijim: [...madrijim],
+    momentos: JSON.parse(JSON.stringify(momentos)),
+    nextId,
+    selectedGrupos: [...selectedGrupos],
+    selectedTipoAct,
+    jagText: (document.getElementById('jagText')||{}).value||'',
+    fecha: (document.getElementById('fecha')||{}).value||'',
+    tema: (document.getElementById('tema')||{}).value||'',
+    contenido: (document.getElementById('contenido')||{}).value||'',
+    objetivo: (document.getElementById('objetivo')||{}).value||'',
+    hilo: (document.getElementById('hilo')||{}).value||'',
+  };
+  planStates[currentShift] = state;
+}
+
+function applyPlanState(state) {
+  madrijim = [...(state.madrijim||[])];
+  momentos = JSON.parse(JSON.stringify(state.momentos||[]));
+  nextId = state.nextId || 1;
+  selectedGrupos = [...(state.selectedGrupos||[])];
+  selectedTipoAct = state.selectedTipoAct || '';
+  const fields = ['fecha','tema','contenido','objetivo','hilo'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = state[id] || '';
+  });
+  const jt = document.getElementById('jagText');
+  if(jt) jt.value = state.jagText || '';
+  renderGrupoChips();
+  renderTipoActChips();
+  renderTeam();
+  renderAll();
+  const jw = document.getElementById('jagWrap');
+  if(jw) jw.classList.toggle('visible', selectedTipoAct === 'Actividad Jaguim');
+  setTimeout(autoResizeAll, 100);
+}
+
+function switchShift(shift) {
+  if(shift === currentShift) return;
+  captureCurrentPlan();
+  saveShiftsToStorage();
+  currentShift = shift;
+  applyPlanState(planStates[currentShift]);
+  updateShiftUI();
+  saveAll();
+}
+
+function updateShiftUI() {
+  const btnT = document.getElementById('btnTarde');
+  const btnN = document.getElementById('btnNocturna');
+  const lbl  = document.getElementById('shiftLabel');
+  if(!btnT) return;
+  btnT.className = 'shift-btn' + (currentShift==='tarde' ? ' active-tarde' : '');
+  btnN.className = 'shift-btn' + (currentShift==='nocturna' ? ' active-nocturna' : '');
+  if(lbl) lbl.textContent = currentShift==='tarde' ? 'Planificando la tarde' : 'Planificando la nocturna';
+}
+
+function saveShiftsToStorage() {
+  try {
+    localStorage.setItem('cissab_shifts', JSON.stringify(planStates));
+    localStorage.setItem('cissab_current_shift', currentShift);
+  } catch(e) {}
+}
+
+function loadShiftsFromStorage() {
+  try {
+    const s = localStorage.getItem('cissab_shifts');
+    const cs = localStorage.getItem('cissab_current_shift');
+    if(s) planStates = JSON.parse(s);
+    if(cs) currentShift = cs;
+  } catch(e) {}
+}
+
 // ── Init ──────────────────────────────────────────
 
 ['grupo','fecha','tema','contenido','objetivo','hilo'].forEach(id=>{
@@ -2558,6 +2690,7 @@ if (tryAutoLogin()) {
 }
 renderGrupoChips();
 renderTipoActChips();
+updateShiftUI();
 </script>
 </body>
 </html>
