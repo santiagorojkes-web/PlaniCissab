@@ -464,8 +464,17 @@ function afterBeLogin() {
   // Start with cached local config, or default if none
   const cached = localStorage.getItem('cissab_area_config_' + beUser.area);
   if (cached) {
-    try { config = JSON.parse(cached); }
-    catch(e) { config = beUser.area === 'Moadon' ? JSON.parse(JSON.stringify(MOADON_DEFAULT)) : JSON.parse(JSON.stringify(EMPTY_CONFIG)); }
+    try {
+      config = JSON.parse(cached);
+      // For Moadon: fill in missing usuarios from default
+      if (beUser.area === 'Moadon') {
+        if (!config.usuarios || Object.keys(config.usuarios).length === 0) {
+          config.usuarios = JSON.parse(JSON.stringify(MOADON_DEFAULT.usuarios));
+        }
+      }
+    } catch(e) {
+      config = beUser.area === 'Moadon' ? JSON.parse(JSON.stringify(MOADON_DEFAULT)) : JSON.parse(JSON.stringify(EMPTY_CONFIG));
+    }
   } else {
     config = beUser.area === 'Moadon'
       ? JSON.parse(JSON.stringify(MOADON_DEFAULT))
