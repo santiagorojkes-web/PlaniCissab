@@ -157,6 +157,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
   .sidebar { display:none; }
   .main { margin-left:0; padding:16px; }
 }
+
+.comment-mic { background:none; border:none; cursor:pointer; font-size:14px; padding:0 4px; color:var(--text-muted); vertical-align:middle; }
+.comment-mic:hover { color:var(--accent); }
+
 </style>
 </head>
 <body>
@@ -208,6 +212,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
       </div>
     </div>
     <div class="sidebar-footer">
+      <button class="btn primary" onclick="guardarConfig()" id="saveConfigBtn" style="width:100%;margin-bottom:10px;justify-content:center;">💾 Guardar config</button>
       <button class="logout-btn" onclick="beLogout()">⏏ Cerrar sesión</button>
     </div>
   </nav>
@@ -309,7 +314,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
           <button class="btn" onclick="volverExplorer()">← Volver</button>
           <span id="correctionFileName" style="font-size:14px;font-weight:700;"></span>
-          <button class="btn success" onclick="guardarCorreccion()" style="margin-left:auto;">💾 Guardar corrección</button>
+
         </div>
         <div id="correctionContent"></div>
       </div>
@@ -318,9 +323,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
   </main>
 
   <!-- Save bar -->
-  <div class="save-bar">
+  <div class="save-bar" id="saveBar">
     <div class="save-bar-info" id="saveBarInfo">Todo guardado</div>
-    <button class="btn primary" id="saveBtn" onclick="guardarConfig()">💾 Guardar configuración</button>
+    <button class="btn primary" id="saveCommentBtn" onclick="guardarCorreccion()" style="display:none;">💬 Guardar comentarios</button>
   </div>
 </div>
 
@@ -402,19 +407,23 @@ function tryBeAutoLogin() {
 }
 
 function afterBeLogin() {
+  // Reset Drive state for this user's session
+  beGAccessToken = null; beTokenClient = null; beAreaFolderId = null;
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appShell').style.display = 'block';
   document.getElementById('sidebarArea').textContent = beUser.area;
-  // Load config for this area
   config = beUser.area === 'Moadon'
     ? JSON.parse(JSON.stringify(MOADON_DEFAULT))
     : JSON.parse(JSON.stringify(EMPTY_CONFIG));
+  showPage('grupos'); // Always start here
   renderAll();
 }
 
 function beLogout() {
   localStorage.removeItem('be_session');
   beUser = null; config = null;
+  // Reset Drive state for next user
+  beGAccessToken = null; beTokenClient = null; beAreaFolderId = null;
   document.getElementById('appShell').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('beEmail').value = '';
@@ -429,6 +438,14 @@ function showPage(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   document.querySelector(`[data-page="${id}"]`).classList.add('active');
+  // Toggle bottom bar buttons
+  const inCorrection = id === 'correccion';
+  const saveBar = document.getElementById('saveBar');
+  const saveCommentBtn = document.getElementById('saveCommentBtn');
+  const saveConfigBtn = document.getElementById('saveConfigBtn');
+  if (saveCommentBtn) saveCommentBtn.style.display = inCorrection ? 'flex' : 'none';
+  if (saveConfigBtn) saveConfigBtn.style.display = inCorrection ? 'none' : 'block';
+  if (saveBar) saveBar.style.display = inCorrection ? 'flex' : 'flex';
   if (id === 'correccion' && beGAccessToken) loadExplorer();
 }
 
@@ -445,23 +462,32 @@ function renderAll() {
 // ══════════════════════════════════════════════════════
 // GRUPOS Y MADRIJIM
 // ══════════════════════════════════════════════════════
-function renderGrupos() {
+function renderGrupos(keepOpen) {
+  // Save which groups are currently open
+  if (!keepOpen) {
+    keepOpen = new Set();
+    document.querySelectorAll('.grupo-body.open').forEach(body => {
+      const header = body.previousElementSibling;
+      if (header) keepOpen.add(header.querySelector('.grupo-nombre').textContent.replace('👥 ','').trim());
+    });
+  }
   const list = document.getElementById('gruposList');
   list.innerHTML = '';
   Object.entries(config.grupos).forEach(([nombre, madrijim]) => {
     const div = document.createElement('div');
     div.className = 'grupo-row';
+    const isOpen = keepOpen.has(nombre);
     div.innerHTML = `
       <div class="grupo-header" onclick="toggleGrupoBody(this)">
         <span class="grupo-nombre">👥 ${escBe(nombre)}</span>
         <span style="font-size:12px;color:var(--text-muted);">${madrijim.length} madrijim</span>
         <span style="margin-left:8px;color:var(--text-faint);">▾</span>
       </div>
-      <div class="grupo-body">
+      <div class="grupo-body${isOpen?' open':''}">
         <div class="field-label" style="margin-bottom:6px;">Madrijim</div>
         <div class="tags-wrap" id="tags-${escBe(nombre)}">
           ${madrijim.map(m => `<span class="tag">${escBe(m)}<button class="tag-del" onclick="quitarMadrij('${escBe(nombre)}','${escBe(m)}')">×</button></span>`).join('')}
-          <input class="tag-add-input" placeholder="Agregar madrij..." onkeydown="if(event.key==='Enter')agregarMadrij('${escBe(nombre)}',this)"/>
+          <input class="tag-add-input" placeholder="Agregar madrij..." onkeydown="if(event.key==='Enter'){event.stopPropagation();agregarMadrij('${escBe(nombre)}',this);}"/>
         </div>
         <div class="grupo-actions" style="margin-top:12px;">
           <button class="btn danger" onclick="eliminarGrupo('${escBe(nombre)}')">🗑 Eliminar grupo</button>
@@ -501,7 +527,13 @@ function agregarMadrij(grupo, input) {
   config.grupos[grupo].push(nombre);
   input.value = '';
   markUnsaved();
-  renderGrupos();
+  // Keep this group open after re-render
+  renderGrupos(new Set([grupo]));
+  // Re-focus input
+  setTimeout(()=>{
+    const inp = document.querySelector(`#tags-${CSS.escape(grupo)} .tag-add-input`);
+    if(inp) inp.focus();
+  }, 50);
 }
 
 function quitarMadrij(grupo, madrij) {
@@ -691,7 +723,7 @@ async function guardarConfig() {
   // También crear carpetas en Drive para grupos y actividades nuevas
   if (beGAccessToken && beAreaFolderId) {
     const btn = document.getElementById('saveBtn');
-    btn.textContent = '⏳ Guardando...';
+    btn.textContent = '⏳ Guardando...'; btn.disabled=true;
     btn.disabled = true;
     try {
       await crearCarpetasFaltantes();
@@ -713,24 +745,29 @@ async function guardarConfig() {
 }
 
 async function crearCarpetasFaltantes() {
+  await initBeAreaFolder();
+  if (!beAreaFolderId) return;
   // List current folders in area
   const q = `mimeType='application/vnd.google-apps.folder' and '${beAreaFolderId}' in parents and trashed=false`;
   const r = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
   const existing = new Set((r.files||[]).map(f => f.name.toLowerCase()));
 
   const toCreate = [];
-  // Group folders
-  Object.keys(config.grupos).forEach(g => { if (!existing.has(g.toLowerCase())) toCreate.push(g); });
+  // Group folders - skip if already exist (case-insensitive)
+  Object.keys(config.grupos).forEach(g => {
+    if (!existing.has(g.toLowerCase())) toCreate.push(g);
+  });
   // Activity folders
   config.tiposActividad.forEach(a => {
     if (a.carpeta && !existing.has(a.carpeta.toLowerCase())) toCreate.push(a.carpeta);
   });
 
   for (const nombre of toCreate) {
-    await beApi('https://www.googleapis.com/drive/v3/files', {
+    const created = await beApi('https://www.googleapis.com/drive/v3/files', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ name: nombre, mimeType:'application/vnd.google-apps.folder', parents:[beAreaFolderId] })
     });
+    if (created.id) existing.add(nombre.toLowerCase()); // update local set
   }
   if (toCreate.length) showToastBe(`✓ ${toCreate.length} carpeta(s) creada(s) en Drive`);
 }
@@ -943,6 +980,7 @@ function renderCorrectionView(plan, fileName) {
           </div>
           <div class="add-comment-row">
             <input class="add-comment-input" id="commentInput-${mi}" placeholder="Escribí un comentario..." onkeydown="if(event.key==='Enter')agregarComentario(${mi})"/>
+            <button class="comment-mic" id="micBtn-${mi}" onclick="toggleMicComment(this,'commentInput-${mi}')" title="Dictar comentario">🎙</button>
             <button class="add-comment-btn" onclick="agregarComentario(${mi})">+ Agregar</button>
           </div>
         </div>
@@ -970,8 +1008,8 @@ function quitarComentario(mi, ci) {
 
 async function guardarCorreccion() {
   if (!currentCorrectionPlan || !currentCorrectionFileId) return;
-  const btn = document.querySelector('#correctionViewer .btn.success');
-  btn.textContent = '⏳ Guardando...';
+  const btn = document.getElementById('saveCommentBtn');
+  btn.textContent = '⏳ Guardando...'; btn.disabled=true;
   btn.disabled = true;
 
   try {
@@ -981,7 +1019,7 @@ async function guardarCorreccion() {
 
     // Build printable HTML with comments highlighted
     const pdfBlob = await generarPdfConComentarios(currentCorrectionPlan);
-    const nuevoNombre = currentCorrectionFileName.replace('.pdf','') + ' (corregida).pdf';
+    const nuevoNombre = currentCorrectionFileName.replace('.pdf','') + ' (con comentarios).pdf';
 
     // Get parent folder
     const parentFolderData = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents`);
@@ -1008,7 +1046,7 @@ async function guardarCorreccion() {
   } catch(e) {
     showToastBe('Error: ' + e.message);
   } finally {
-    btn.textContent = '💾 Guardar corrección';
+    btn.textContent = '💬 Guardar comentarios'; btn.disabled=false;
     btn.disabled = false;
   }
 }
@@ -1018,7 +1056,6 @@ async function generarPdfConComentarios(plan) {
   const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const PAGE_W = 794, PAGE_W_MM = 210, PAGE_H_MM = 297;
 
-  // Build HTML
   const tc = {
     Recibimiento:{bg:'#dbeafe',color:'#1e3a5f'},
     Traslado:{bg:'#f1f0ed',color:'#3d3b37'},
@@ -1029,20 +1066,22 @@ async function generarPdfConComentarios(plan) {
   };
 
   const momentosHtml = (plan.momentos||[]).map(m => {
-    const c = tc[m.tipo] || {bg:'#f1f0ed',color:'#333'};
+    const tc2 = tc[m.tipo] || {bg:'#f1f0ed',color:'#333'};
     const tipoLabel = m.tipo === 'Personalizado' ? (m.customTipo||'Personalizado') : m.tipo;
-    const comentariosHtml = (m._comentarios||[]).length
-      ? `<div style="margin-top:8px;border-left:4px solid #f59e0b;background:#fef3c7;padding:8px 12px;border-radius:4px;">
+    const comentariosArr = m._comentarios || [];
+    const comentariosBlock = comentariosArr.length > 0
+      ? `<div style="margin:8px 12px 0;border-left:4px solid #f59e0b;background:#fef3c7;padding:8px 12px;border-radius:4px;">
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;margin-bottom:4px;">💬 Comentarios del coordinador</div>
-          ${(m._comentarios||[]).map(c => `<div style="font-size:10px;color:#78350f;margin-bottom:3px;">• ${c}</div>`).join('')}
+          ${comentariosArr.map(cc => `<div style="font-size:10px;color:#78350f;margin-bottom:3px;line-height:1.4;">• ${cc}</div>`).join('')}
         </div>` : '';
-    return `<div style="margin-bottom:12px;">
-      <div style="background:#fff3eb;padding:8px 12px;border-left:4px solid #e8630a;display:flex;align-items:center;gap:8px;">
-        <span style="background:${c.bg};color:${c.color};padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;">${tipoLabel}</span>
+    return `<div style="margin-bottom:12px;border:1px solid #fcd9c0;border-radius:6px;overflow:hidden;">
+      <div style="background:#fff3eb;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+        <span style="background:${tc2.bg};color:${tc2.color};padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;">${tipoLabel}</span>
         <span style="font-size:11px;color:#7a5c44;">${m.horaInicio||''}${m.horaInicio&&m.horaCierre?' → ':''}${m.horaCierre||''}</span>
       </div>
-      <div style="padding:8px 12px;font-size:11px;color:#1a1917;">${m.desc||'—'}</div>
-      ${comentariosHtml}
+      <div style="padding:8px 12px;font-size:11px;color:#1a1917;line-height:1.5;">${m.desc||'—'}</div>
+      ${comentariosBlock}
+      <div style="height:4px;"></div>
     </div>`;
   }).join('');
 
@@ -1098,6 +1137,8 @@ function volverExplorer() {
   document.getElementById('correctionViewer').style.display = 'none';
   currentCorrectionPlan = null;
   currentCorrectionFileId = null;
+  currentCorrectionFileName = null;
+  stopMicBe();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1134,6 +1175,44 @@ window.addEventListener('beforeunload', e => { if (unsaved) e.returnValue = ''; 
 // ── Init ──
 if (tryBeAutoLogin()) afterBeLogin();
 else document.getElementById('loginScreen').style.display = 'flex';
+
+// ── SPEECH RECOGNITION (comments) ──
+const SpeechRecognitionBe = window.SpeechRecognition || window.webkitSpeechRecognition;
+let beActiveRec = null; let beMicBtn = null;
+
+async function toggleMicComment(btn, inputId) {
+  if (beMicBtn === btn) { stopMicBe(); return; }
+  if (beActiveRec) stopMicBe();
+  if (!SpeechRecognitionBe) { showToastBe('Tu navegador no soporta dictado'); return; }
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) { showToastBe('No se pudo acceder al micrófono'); return; }
+  const rec = new SpeechRecognitionBe();
+  rec.lang = 'es-AR'; rec.continuous = true; rec.interimResults = true;
+  let base = input.value;
+  if (base && !base.endsWith(' ')) base += ' ';
+  btn.style.color = '#ef4444'; btn.title = 'Detener dictado';
+  beMicBtn = btn; beActiveRec = rec;
+  rec.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t; else interim += t;
+    }
+    if (final) base += final + ' ';
+    input.value = base + interim;
+  };
+  rec.onerror = () => stopMicBe();
+  rec.onend = () => { if (beActiveRec === rec) try { rec.start(); } catch(e) { stopMicBe(); } };
+  try { rec.start(); } catch(e) { showToastBe('Error al iniciar micrófono'); beMicBtn=null; beActiveRec=null; }
+}
+function stopMicBe() {
+  if (beActiveRec) { try { beActiveRec.stop(); } catch(e){} beActiveRec = null; }
+  if (beMicBtn) { beMicBtn.style.color = ''; beMicBtn.title = 'Dictar comentario'; beMicBtn = null; }
+}
+
 </script>
 </body>
 </html>
