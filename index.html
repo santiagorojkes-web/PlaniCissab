@@ -961,11 +961,18 @@ const ACTIVITY_FOLDER_MAP={'Actividad Chill':'Actividades Chill','Actividad Depo
 let driveRootFolders={};
 let pendingBlob=null,pendingName=null;
 
+// Known folder IDs (hardcoded for folders not directly inside CARPETA_RAIZ_ID)
+const KNOWN_FOLDER_IDS = {
+  'teshuka': '1WS3lZPFRQ-g0NPFBFyYKxUEJihi4t5hh',
+};
+
 async function loadDriveFolders(){
   // Only LIST existing folders - never create new ones
   const q=`mimeType='application/vnd.google-apps.folder' and '${CARPETA_RAIZ_ID}' in parents and trashed=false`;
   const r=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
   const ex={};(r.files||[]).forEach(f=>ex[f.name.toLowerCase()]=f.id);
+  // Merge known IDs (overrides auto-detected if different)
+  Object.assign(ex, KNOWN_FOLDER_IDS);
   driveRootFolders=ex;
 }
 // Keep old name as alias for compatibility
@@ -977,8 +984,8 @@ async function ejecutarSubida(){
   btn.disabled=true;btn.textContent='⏳ Preparando...';
   try{
     await ensureActivityFolders();
+    pendingName = getNombreArchivo() || 'Planificación';
     pendingBlob=await generarPdfBlob();
-    pendingName=getNombreArchivo();
     abrirDriveFolderModal();
   }catch(e){showToast('Error: '+e.message);}
   finally{btn.disabled=false;btn.innerHTML=origHtml;}
@@ -1077,7 +1084,7 @@ async function confirmarSubidaDrive(){
   }
   cerrarDriveFolderModal();
   if(ok>0 && failedFolders.length===0){
-    showToast(`✓ "${pendingName}" subido a ${ok} carpeta${ok>1?'s':''}`);
+    showToast(`✓ "${pendingName||'Planificación'}" subido a ${ok} carpeta${ok>1?'s':''}`);
   } else if(ok>0 && failedFolders.length>0){
     showToast(`✓ Subido a ${ok} carpeta${ok>1?'s':''}. No encontrada: ${failedFolders.join(', ')}`);
   } else {
@@ -1200,7 +1207,7 @@ const GRUPO_MADRIJIM = {
   Nitzajon:['Solchu','Ezi','Martu'],
   Mejudash:['Valencha','Aieka','Juli'],
 };
-const TIPOS = ['Recibimiento','Traslado','Juego','Merienda','Cierre'];
+const TIPOS = ['Recibimiento','Traslado','Juego','Merienda','Cierre','Personalizado'];
 
 let madrijim=[], momentos=[], nextId=1;
 let dragSrcId=null;
