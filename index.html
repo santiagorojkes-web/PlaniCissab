@@ -654,22 +654,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 </style>
 </head>
 <body>
-<div id="driveConfigPrompt" style="display:none;position:fixed;inset:0;z-index:999999;background:rgba(26,25,23,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;font-family:'DM Sans',sans-serif;">
-  <div style="background:#fff;border-radius:20px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(232,99,10,.2);overflow:hidden;">
-    <div style="background:#e8630a;padding:20px;text-align:center;">
-      <div style="font-size:32px;">☁️</div>
-      <div style="font-size:17px;font-weight:800;color:#fff;margin-top:6px;">Conectar con Drive</div>
-    </div>
-    <div style="padding:20px 24px;">
-      <div id="dcpAreaLabel" style="display:inline-block;background:#fff3eb;color:#e8630a;font-weight:700;font-size:13px;border-radius:20px;padding:3px 12px;margin-bottom:10px;">Moadon</div>
-      <div style="font-size:13px;color:#6b6560;line-height:1.5;margin-bottom:20px;">Conectate con Google para descargar la configuración más reciente de tu área: grupos, madrijim y tipos de actividad actualizados.</div>
-      <button id="dcpConnectBtn" onclick="connectDriveForConfig()" style="width:100%;background:#e8630a;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="16" height="14"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
-        Conectar con Drive
-      </button>
-    </div>
-  </div>
-</div>
+
 
 
 <!-- Startup modal -->
@@ -1601,9 +1586,8 @@ function iniciarGoogleAuth() {
         ensureActivityFolders().catch(()=>{});
         if (window._pendingConfigLoad) {
           window._pendingConfigLoad = false;
-          document.getElementById('driveConfigPrompt').style.display = 'none';
-          const loadBtn = document.getElementById('dcpConnectBtn');
-          if (loadBtn) { loadBtn.textContent = '✓ Conectado'; loadBtn.disabled = false; }
+          const _dp = document.getElementById('driveConfigPrompt'); if(_dp) _dp.remove();
+          const _lb = document.getElementById('dcpConnectBtn'); if(_lb){ _lb.textContent='✓ Conectado'; _lb.disabled=false; }
           // Load config then go to main modal
           await loadConfigFromDrive();
           // Mark as ever connected — popup won't show again on this device
