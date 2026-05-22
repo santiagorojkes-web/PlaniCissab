@@ -857,7 +857,20 @@ async function cargarConfigDesdeDrive() {
     const driveConfig = await resp.json();
     if (driveConfig && driveConfig.grupos) {
       config = driveConfig;
-      // Save to localStorage so other devices can use it
+      // For Moadon: always fill usuarios from default if missing or incomplete
+      if (beUser.area === 'Moadon') {
+        if (!config.usuarios || Object.keys(config.usuarios).length === 0) {
+          config.usuarios = JSON.parse(JSON.stringify(MOADON_DEFAULT.usuarios));
+        } else {
+          // Fill in any grupo that's missing email/pw
+          Object.keys(MOADON_DEFAULT.usuarios).forEach(g => {
+            if (!config.usuarios[g] || !config.usuarios[g].email) {
+              config.usuarios[g] = JSON.parse(JSON.stringify(MOADON_DEFAULT.usuarios[g]));
+            }
+          });
+        }
+      }
+      // Save to localStorage
       localStorage.setItem('cissab_area_config_' + beUser.area, JSON.stringify(config));
       renderAll();
       showToastBe('✓ Config cargada desde Drive');
