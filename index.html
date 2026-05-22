@@ -112,7 +112,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 
 /* tipo badge */
 .tipo-wrap{position:relative;display:inline-block;}
-.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:opacity .15s;}
+.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:opacity .15s;;max-width:100%;box-sizing:border-box;}
 .tipo-badge:hover{opacity:.8;}
 .arrow{font-size:9px;}
 .tipo-Recibimiento{background:var(--recibimiento);color:var(--recibimiento-t);}
@@ -530,7 +530,11 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 
 /* ── MOMENTO PERSONALIZADO ── */
 .tipo-Personalizado{background:#f3e8ff;color:#6b21a8;}
-.custom-tipo-input{border:none;background:transparent;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;color:#6b21a8;outline:none;width:90px;min-width:50px;}
+.custom-tipo-input{
+  border:none;background:transparent;font-size:11px;font-weight:600;
+  font-family:'DM Sans',sans-serif;color:#6b21a8;outline:none;
+  min-width:60px;width:auto;max-width:160px;flex:1;
+}
 .custom-tipo-input::placeholder{color:#c084fc;}
 
 /* ── DRIVE FOLDER MODAL ── */
@@ -1729,7 +1733,7 @@ function renderAll(){
         <div class="tipo-wrap">
           <button class="tipo-badge tipo-${m.tipo}" onclick="toggleDD(${m.id},this)">
             ${m.tipo==='Personalizado'
-              ? `<input class="custom-tipo-input" value="${esc(m.customTipo||'')}" placeholder="Nombrar..." onclick="event.stopPropagation()" oninput="event.stopPropagation();upd(${m.id},'customTipo',this.value)"/>`
+              ? `<input class="custom-tipo-input" value="${esc(m.customTipo||'')}" placeholder="Nombrar..." onclick="event.stopPropagation()" oninput="event.stopPropagation();upd(${m.id},'customTipo',this.value)"/><span class="arrow" style="flex-shrink:0;">▾</span>`
               : `${m.tipo} <span class="arrow">▾</span>`}
           </button>
           <div class="tipo-dropdown" id="dd-${m.id}">
