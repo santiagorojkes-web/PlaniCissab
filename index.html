@@ -961,18 +961,15 @@ const ACTIVITY_FOLDER_MAP={'Actividad Chill':'Actividades Chill','Actividad Depo
 let driveRootFolders={};
 let pendingBlob=null,pendingName=null;
 
-async function ensureActivityFolders(){
+async function loadDriveFolders(){
+  // Only LIST existing folders - never create new ones
   const q=`mimeType='application/vnd.google-apps.folder' and '${CARPETA_RAIZ_ID}' in parents and trashed=false`;
   const r=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
   const ex={};(r.files||[]).forEach(f=>ex[f.name.toLowerCase()]=f.id);
-  for(const name of ACTIVITY_FOLDERS){
-    if(!ex[name.toLowerCase()]){
-      const c=await driveApi('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:[CARPETA_RAIZ_ID]})});
-      ex[name.toLowerCase()]=c.id;
-    }
-  }
   driveRootFolders=ex;
 }
+// Keep old name as alias for compatibility
+async function ensureActivityFolders(){ return loadDriveFolders(); }
 
 async function ejecutarSubida(){
   const btn=document.getElementById('btnDrive');
@@ -1076,10 +1073,9 @@ async function syncToDrive(){
   try{
     const gn=getGrupoNombre();
     // Ensure folder exists (creates if missing)
-    let fid=driveRootFolders[gn.toLowerCase()];
-    if(!fid){ await ensureActivityFolders(); fid=driveRootFolders[gn.toLowerCase()]; }
-    if(!fid){ fid = await buscarCarpetaGrupo(gn); driveRootFolders[gn.toLowerCase()]=fid; }
-    if(!fid)return;
+    await loadDriveFolders();
+    const fid=driveRootFolders[gn.toLowerCase()];
+    if(!fid)return; // folder doesn't exist yet, skip sync silently
     const data={_sync:true,ts:Date.now(),selectedGrupos,madrijim,momentos,fields:{}};
     ['grupo','fecha','tema','contenido','objetivo','hilo','tipoActividad','jagText'].forEach(id=>{const el=document.getElementById(id);if(el)data.fields[id]=el.value||'';});
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
@@ -1098,8 +1094,8 @@ async function loadFromDrive(){
   try{
     await ensureActivityFolders();
     const gn=getGrupoNombre()||(currentUser&&currentUser.grupo)||'';
-    let fid=driveRootFolders[gn.toLowerCase()];
-    if(!fid){ fid = await buscarCarpetaGrupo(gn); driveRootFolders[gn.toLowerCase()]=fid; }
+    await loadDriveFolders();
+    const fid=driveRootFolders[gn.toLowerCase()];
     if(!fid)return null;
     const q=`name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
     const s=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
@@ -1357,7 +1353,17 @@ function iniciarGoogleAuth() {
         gAccessToken = resp.access_token;
         // Create activity folders eagerly
         ensureActivityFolders().catch(()=>{});
-        if (window._pendingSync) { window._pendingSync = false; await _doLoadFromDrive(); return; }
+        if (window._pendingSync) {
+          window._pendingSync = false;
+          if (window._silentAuth) {
+            // Just sync, don't show folder modal
+            window._silentAuth = false;
+            syncToDrive().catch(()=>{});
+          } else {
+            await _doLoadFromDrive();
+          }
+          return;
+        }
         if (driveUploadPending) { driveUploadPending = false; await ejecutarSubida(); }
       }
     });
@@ -1379,20 +1385,10 @@ async function driveApi(url, options = {}) {
 }
 
 async function buscarCarpetaGrupo(nombreGrupo) {
-  // Lista TODAS las carpetas dentro de Planificaciones y busca por nombre ignorando mayúsculas
-  const q = `mimeType='application/vnd.google-apps.folder' and '${CARPETA_RAIZ_ID}' in parents and trashed=false`;
-  const result = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50`);
-  if (result.files && result.files.length > 0) {
-    const match = result.files.find(f => f.name.toLowerCase() === nombreGrupo.toLowerCase());
-    if (match) return match.id;
-  }
-  // Si no existe con ningún case, la crea
-  const creado = await driveApi('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: nombreGrupo, mimeType: 'application/vnd.google-apps.folder', parents: [CARPETA_RAIZ_ID] })
-  });
-  return creado.id;
+  // Only find - never create
+  if (driveRootFolders[nombreGrupo.toLowerCase()]) return driveRootFolders[nombreGrupo.toLowerCase()];
+  await loadDriveFolders();
+  return driveRootFolders[nombreGrupo.toLowerCase()] || null;
 }
 
 async function generarPdfBlob() {
@@ -1715,7 +1711,18 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
-function guardar(){saveAll();showToast('✓ Planificación guardada');syncToDrive().catch(()=>{});}
+function guardar(){
+  saveAll();
+  showToast('✓ Planificación guardada');
+  if (gAccessToken) {
+    syncToDrive().catch(()=>{});
+  } else {
+    // Auto-auth so sync works - user sees a brief Google popup
+    window._pendingSync = true;
+    window._silentAuth = true;
+    iniciarGoogleAuth();
+  }
+}
 function abrirVistaImpresion() {
   const grupo     = getGrupoNombre();
   const fecha     = document.getElementById('fecha').value    || '';
