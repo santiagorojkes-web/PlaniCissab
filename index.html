@@ -1079,6 +1079,9 @@ function abrirDriveFolderModal(){
     html+='</div>';
   }
   body.innerHTML=html||'<p style="color:var(--text-muted);font-size:13px;">No hay carpetas disponibles.</p>';
+  // Always reset confirm button when opening modal
+  const _cb = document.getElementById('dfmConfirmBtn');
+  if(_cb){ _cb.disabled=false; _cb.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="16" height="14"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg> Subir a seleccionadas'; }
   document.getElementById('driveFolderModal').classList.add('open');
 }
 
@@ -1118,6 +1121,7 @@ async function confirmarSubidaDrive(){
   const confirmBtn=document.getElementById('dfmConfirmBtn');
   confirmBtn.disabled=true;confirmBtn.textContent='⏳ Subiendo...';
   let ok=0;
+  try{
   const mesNombre = getMesCarpeta();
   const grupoNamesLower = ALL_GRUPOS.map(g=>g.toLowerCase());
   // Always reload folder list before uploading to avoid stale cache
@@ -1154,9 +1158,12 @@ async function confirmarSubidaDrive(){
   } else {
     showToast('Error: no se pudo subir a ninguna carpeta. Verificá la conexión con Drive.');
   }
-  confirmBtn.disabled=false;
-  // Delete _sync.json from group folder(s) after successful upload
   if(ok>0) deleteSyncFiles(sel).catch(()=>{});
+  } catch(e){
+    showToast('Error inesperado: ' + e.message);
+  } finally {
+    confirmBtn.disabled=false;
+  }
 }
 
 async function deleteSyncFiles(uploadedFolderNames) {
@@ -2601,6 +2608,7 @@ const emptyPlanState = () => ({
 let planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState() };
 
 function captureCurrentPlan() {
+  const fechaVal = (document.getElementById('fecha')||{}).value||'';
   const state = {
     madrijim: [...madrijim],
     momentos: JSON.parse(JSON.stringify(momentos)),
@@ -2608,13 +2616,16 @@ function captureCurrentPlan() {
     selectedGrupos: [...selectedGrupos],
     selectedTipoAct,
     jagText: (document.getElementById('jagText')||{}).value||'',
-    fecha: (document.getElementById('fecha')||{}).value||'',
+    fecha: fechaVal,
     tema: (document.getElementById('tema')||{}).value||'',
     contenido: (document.getElementById('contenido')||{}).value||'',
     objetivo: (document.getElementById('objetivo')||{}).value||'',
     hilo: (document.getElementById('hilo')||{}).value||'',
   };
   planStates[currentShift] = state;
+  // Fecha is shared - sync it to the other plan too
+  const other = currentShift === 'tarde' ? 'nocturna' : 'tarde';
+  if(planStates[other]) planStates[other].fecha = fechaVal;
 }
 
 function applyPlanState(state) {
