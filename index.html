@@ -970,14 +970,8 @@ function afterLogin() {
     renderGrupoChips();
     updateMadrijimFromGrupos();
   }
-  // Show popup only on first time. Otherwise refresh silently in background.
-  if (shouldShowDriveConfigPrompt()) {
-    showDriveConfigPrompt();
-  } else {
-    showModal();
-    // Try silent Drive re-auth to refresh config (no popup if already authorized)
-    trySilentConfigRefresh();
-  }
+  // Always show Drive config popup so config is always fresh
+  showDriveConfigPrompt();
 }
 
 // ══════════════════════════════════════════════════════
