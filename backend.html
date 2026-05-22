@@ -749,9 +749,7 @@ let beAreaFolderId = null;
 
 
 function mostrarDrivePrompt() {
-  // Always show Drive prompt on login
-  // Try silent reconnect in background - if it works, dismiss popup automatically
-  silentReconnectDrive();
+  // Show our custom popup — Google auth only happens when user clicks the button
   document.getElementById('drivePromptModal').style.display = 'flex';
 }
 
