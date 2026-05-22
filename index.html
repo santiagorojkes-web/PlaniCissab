@@ -966,8 +966,8 @@ function afterLogin() {
     renderGrupoChips();
     updateMadrijimFromGrupos();
   }
-  // Always show Drive config popup so config is always fresh
-  showDriveConfigPrompt();
+  // Show Drive config popup after a short delay (ensures login overlay is fully hidden)
+  setTimeout(showDriveConfigPrompt, 150);
 }
 
 // ══════════════════════════════════════════════════════
@@ -2831,6 +2831,17 @@ function marcarComentario(momentoId, commentIdx) {
 
 function applyAreaConfig(cfg) {
   if (!cfg) return;
+
+  // Update login credentials from config (usuarios field)
+  if (cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
+    // Remove non-admin users and replace with config usuarios
+    const admins = USERS.filter(u => u.isAdmin);
+    const newUsers = Object.entries(cfg.usuarios).map(([grupo, u]) => ({
+      email: u.email, pw: u.pw, grupo, isAdmin: false
+    })).filter(u => u.email && u.pw);
+    USERS.length = 0;
+    [...newUsers, ...admins].forEach(u => USERS.push(u));
+  }
 
   // Groups + madrijim
   if (cfg.grupos && Object.keys(cfg.grupos).length > 0) {
