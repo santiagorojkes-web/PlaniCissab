@@ -864,6 +864,7 @@ function logout() {
   currentUser = null;
   gAccessToken = null;
   gTokenClient = null;
+  carpetaAreaId = null;
   document.getElementById('mainPage').style.display='none';
   document.getElementById('startModal').style.display='none';
   document.getElementById('loginOverlay').style.display='flex';
@@ -1031,11 +1032,12 @@ const KNOWN_FOLDER_IDS = {
 };
 
 async function loadDriveFolders(){
-  // Only LIST existing folders - never create new ones
-  const q=`mimeType='application/vnd.google-apps.folder' and '${CARPETA_RAIZ_ID}' in parents and trashed=false`;
+  await initAreaFolder();
+  if (!carpetaAreaId) return;
+  // List groups and activity folders inside the area subfolder
+  const q=`mimeType='application/vnd.google-apps.folder' and '${carpetaAreaId}' in parents and trashed=false`;
   const r=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
   const ex={};(r.files||[]).forEach(f=>ex[f.name.toLowerCase()]=f.id);
-  // Merge known IDs (overrides auto-detected if different)
   Object.assign(ex, KNOWN_FOLDER_IDS);
   driveRootFolders=ex;
 }
@@ -1474,8 +1476,24 @@ const AUTHORIZED_EMAILS = [
   'teshukacissab@gmail.com',
 ];
 
-// ID fijo de la carpeta "Planificaciones" en Drive (no cambiar)
+// ID fijo de la carpeta "Planificaciones" en Drive — raíz compartida para todas las áreas
 const CARPETA_RAIZ_ID = '1hiLmTa_gwzq39fmbUadm8utnhL-XiUme';
+
+// ID de la carpeta del área actual (se resuelve tras autenticar con Drive)
+let carpetaAreaId = null;
+
+async function initAreaFolder() {
+  if (carpetaAreaId) return; // ya encontrada
+  // Por ahora siempre Moadon — el backend lo hará configurable por área
+  const areaNombre = 'Moadon';
+  const q = `name='${areaNombre}' and '${CARPETA_RAIZ_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+  if (r.files && r.files.length > 0) {
+    carpetaAreaId = r.files[0].id;
+  } else {
+    console.warn('No se encontró la carpeta del área en Drive');
+  }
+}
 
 let gAccessToken = null;
 let gTokenClient = null;
@@ -1537,10 +1555,21 @@ async function driveApi(url, options = {}) {
 }
 
 async function buscarCarpetaGrupo(nombreGrupo) {
-  // Only find - never create
   if (driveRootFolders[nombreGrupo.toLowerCase()]) return driveRootFolders[nombreGrupo.toLowerCase()];
   await loadDriveFolders();
   return driveRootFolders[nombreGrupo.toLowerCase()] || null;
+}
+
+// Create a folder inside the area root (used by backend config for new groups/activity types)
+async function crearCarpetaEnArea(nombre) {
+  await initAreaFolder();
+  if (!carpetaAreaId) return null;
+  const c = await driveApi('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name: nombre, mimeType: 'application/vnd.google-apps.folder', parents: [carpetaAreaId] })
+  });
+  if (c.id) driveRootFolders[nombre.toLowerCase()] = c.id;
+  return c.id || null;
 }
 
 async function generarPdfBlob() {
