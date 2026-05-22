@@ -624,6 +624,33 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .coord-comment-done { background:#16a34a; color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .coord-comment-done:hover { background:#15803d; }
 
+
+/* ── DRIVE CONFIG POPUP ── */
+#driveConfigPrompt {
+  position:fixed;inset:0;z-index:100001;
+  background:rgba(26,25,23,.65);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;padding:16px;
+  font-family:'DM Sans',sans-serif;
+}
+.dcp-box {
+  background:#fff;border-radius:20px;
+  width:100%;max-width:380px;
+  box-shadow:0 24px 64px rgba(232,99,10,.2);
+  overflow:hidden;
+}
+.dcp-header {
+  background:var(--accent);padding:20px;text-align:center;
+}
+.dcp-icon { font-size:32px; }
+.dcp-title { font-size:17px;font-weight:800;color:#fff;margin-top:6px; }
+.dcp-body { padding:20px 24px; }
+.dcp-area { display:inline-block;background:var(--accent-light);color:var(--accent);font-weight:700;font-size:13px;border-radius:20px;padding:3px 12px;margin-bottom:10px; }
+.dcp-desc { font-size:13px;color:var(--text-muted);line-height:1.5;margin-bottom:20px; }
+.dcp-btn-primary { width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px; }
+.dcp-btn-primary:hover { background:var(--accent-dark); }
+.dcp-btn-skip { width:100%;background:none;border:none;color:var(--text-faint);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;padding:6px; }
+.dcp-btn-skip:hover { color:var(--text-muted); }
+
 </style>
 </head>
 <body>
@@ -680,6 +707,27 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
       <button class="btn drive-btn" id="dfmConfirmBtn" onclick="confirmarSubidaDrive()" style="display:flex;align-items:center;gap:7px;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="16" height="14" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
         Subir a seleccionadas
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Drive config popup -->
+<div id="driveConfigPrompt">
+  <div class="dcp-box">
+    <div class="dcp-header">
+      <div class="dcp-icon">☁️</div>
+      <div class="dcp-title">Cargar configuración del área</div>
+    </div>
+    <div class="dcp-body">
+      <div id="dcpAreaLabel" class="dcp-area">Moadon</div>
+      <div class="dcp-desc">
+        Conectá con Google para descargar la configuración más reciente de tu área: grupos, madrijim y tipos de actividad actualizados.
+      </div>
+      <button class="dcp-btn-primary" onclick="connectDriveForConfig()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" width="16" height="14"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+        Conectar con Drive
       </button>
     </div>
   </div>
@@ -912,17 +960,7 @@ function afterLogin() {
   document.getElementById('loginOverlay').style.display='none';
   // 1. Apply cached config instantly (no network)
   loadCachedConfig();
-  // 2. Fetch fresh config from Drive in background (API Key, no OAuth)
-  loadConfigPublic().then(() => {
-    // Re-apply group selection after config refreshes
-    if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
-      if (ALL_GRUPOS.includes(currentUser.grupo) && !selectedGrupos.length) {
-        selectedGrupos=[currentUser.grupo];
-        renderGrupoChips();
-        updateMadrijimFromGrupos();
-      }
-    }
-  }).catch(()=>{});
+
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
     if (ALL_GRUPOS.includes(currentUser.grupo)) {
       selectedGrupos=[currentUser.grupo];
@@ -932,7 +970,14 @@ function afterLogin() {
     renderGrupoChips();
     updateMadrijimFromGrupos();
   }
-  showModal();
+  // Show popup only on first time. Otherwise refresh silently in background.
+  if (shouldShowDriveConfigPrompt()) {
+    showDriveConfigPrompt();
+  } else {
+    showModal();
+    // Try silent Drive re-auth to refresh config (no popup if already authorized)
+    trySilentConfigRefresh();
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1564,10 +1609,23 @@ function iniciarGoogleAuth() {
         loadConfigFromDrive().catch(()=>{});
         // Create activity folders eagerly
         ensureActivityFolders().catch(()=>{});
+        if (window._pendingConfigLoad) {
+          window._pendingConfigLoad = false;
+          document.getElementById('driveConfigPrompt').style.display = 'none';
+          const loadBtn = document.querySelector('.dcp-btn-primary');
+          if (loadBtn) { loadBtn.textContent = '✓ Conectado'; loadBtn.disabled = false; }
+          // Load config then go to main modal
+          await loadConfigFromDrive();
+          // Mark as ever connected — popup won't show again on this device
+          const area = window._currentArea || 'Moadon';
+          localStorage.setItem('cissab_drive_ever_connected_' + area, '1');
+          localStorage.setItem('cissab_area_config_ts_' + area, new Date().toISOString());
+          showModal();
+          return;
+        }
         if (window._pendingSync) {
           window._pendingSync = false;
           if (window._silentAuth) {
-            // Just sync, don't show folder modal
             window._silentAuth = false;
             syncToDrive().catch(()=>{});
           } else {
@@ -2856,6 +2914,18 @@ function loadCachedConfig() {
     if (cached) applyAreaConfig(JSON.parse(cached));
   } catch(e) {}
 }
+
+// Listen for config changes from backend (same tab or same-domain tabs)
+window.addEventListener('storage', (e) => {
+  if (e.key && e.key.startsWith('cissab_area_config_') && !e.key.includes('_ts_')) {
+    const area = e.key.replace('cissab_area_config_', '');
+    if (area === (window._currentArea || 'Moadon')) {
+      try {
+        if (e.newValue) { applyAreaConfig(JSON.parse(e.newValue)); showToast('✓ Config del área actualizada'); }
+      } catch(e2) {}
+    }
+  }
+});
 
 async function loadConfigPublic() {
   // Load area config using API Key — no OAuth needed, works on first visit
