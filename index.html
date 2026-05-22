@@ -112,7 +112,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 
 /* tipo badge */
 .tipo-wrap{position:relative;display:inline-block;}
-.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:opacity .15s;;max-width:100%;box-sizing:border-box;}
+.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:opacity .15s;}
 .tipo-badge:hover{opacity:.8;}
 .arrow{font-size:9px;}
 .tipo-Recibimiento{background:var(--recibimiento);color:var(--recibimiento-t);}
@@ -579,6 +579,27 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .tipo-act-chip[data-tipo="Actividad Jaguim"].active       { background:#8b5cf6; }
 .tipo-act-chip[data-tipo="Actividad Picante"].active      { background:#ef4444; }
 .tipo-act-chip[data-tipo="Actividad de Terror"].active    { background:#1f2937; }
+
+
+.custom-tipo-textarea {
+  display:block;
+  width:100%;
+  margin-top:4px;
+  border:none;
+  border-bottom:1.5px solid #c084fc;
+  background:transparent;
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  font-weight:600;
+  color:#6b21a8;
+  outline:none;
+  resize:none;
+  overflow:hidden;
+  min-height:22px;
+  line-height:1.4;
+  padding:2px 0;
+}
+.custom-tipo-textarea::placeholder { color:#c084fc; font-weight:400; }
 
 </style>
 </head>
@@ -1733,12 +1754,13 @@ function renderAll(){
         <div class="tipo-wrap">
           <button class="tipo-badge tipo-${m.tipo}" onclick="toggleDD(${m.id},this)">
             ${m.tipo==='Personalizado'
-              ? `<input class="custom-tipo-input" value="${esc(m.customTipo||'')}" placeholder="Nombrar..." onclick="event.stopPropagation()" oninput="event.stopPropagation();upd(${m.id},'customTipo',this.value)"/><span class="arrow" style="flex-shrink:0;">▾</span>`
+              ? `✏ Personalizado <span class="arrow">▾</span>`
               : `${m.tipo} <span class="arrow">▾</span>`}
           </button>
           <div class="tipo-dropdown" id="dd-${m.id}">
             ${TIPOS.map(t=>`<button class="tipo-opt" onclick="setTipo(${m.id},'${t}')">${t}</button>`).join('')}
           </div>
+          ${m.tipo==='Personalizado' ? `<textarea class="custom-tipo-textarea" placeholder="Nombre del momento..." oninput="upd(${m.id},'customTipo',this.value);autoResize(this)" onclick="event.stopPropagation()">${esc(m.customTipo||'')}</textarea>` : ''}
         </div>
       </div>
 
