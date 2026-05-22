@@ -1024,16 +1024,20 @@ function getMesCarpeta() {
 }
 
 async function getOrCreateMonthFolder(groupFolderId, mesNombre) {
-  // Look for existing month folder inside group folder
-  const q = `name='${mesNombre}' and '${groupFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
-  if (r.files && r.files.length > 0) return r.files[0].id;
-  // Create the month folder
-  const c = await driveApi('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ name: mesNombre, mimeType: 'application/vnd.google-apps.folder', parents: [groupFolderId] })
-  });
-  return c.id;
+  try {
+    // Look for existing month folder
+    const q = `name='${mesNombre}' and '${groupFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+    if (r.files && r.files.length > 0) return r.files[0].id;
+    // Create it
+    const c = await driveApi('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name: mesNombre, mimeType: 'application/vnd.google-apps.folder', parents: [groupFolderId] })
+    });
+    return c.id || groupFolderId; // fallback to group folder if creation fails
+  } catch(e) {
+    return groupFolderId; // fallback: upload directly to group folder
+  }
 }
 
 async function confirmarSubidaDrive(){
@@ -1051,7 +1055,7 @@ async function confirmarSubidaDrive(){
       // Use monthly subfolder for group folders; direct upload for activity folders
       let targetFid = fid;
       if(mesNombre && grupoNamesLower.includes(name.toLowerCase())) {
-        targetFid = await getOrCreateMonthFolder(fid, mesNombre);
+        targetFid = (await getOrCreateMonthFolder(fid, mesNombre)) || fid;
       }
       const form=new FormData();
       form.append('metadata',new Blob([JSON.stringify({name:pendingName+'.pdf',parents:[targetFid],mimeType:'application/pdf'})],{type:'application/json'}));
@@ -1429,7 +1433,9 @@ async function driveApi(url, options = {}) {
     headers: { ...options.headers, Authorization: `Bearer ${gAccessToken}` }
   });
   if (resp.status === 401) { gAccessToken = null; throw new Error('Token expirado'); }
-  return resp.json();
+  if (resp.status === 204 || resp.headers.get('content-length') === '0') return {};
+  const text = await resp.text();
+  return text ? JSON.parse(text) : {};
 }
 
 async function buscarCarpetaGrupo(nombreGrupo) {
