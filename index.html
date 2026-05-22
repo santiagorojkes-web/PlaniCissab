@@ -1013,6 +1013,29 @@ function abrirDriveFolderModal(){
 
 function cerrarDriveFolderModal(){document.getElementById('driveFolderModal').classList.remove('open');pendingBlob=null;pendingName=null;}
 
+
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function getMesCarpeta() {
+  const fecha = (document.getElementById('fecha')||{}).value || '';
+  if (!fecha) return null;
+  const d = new Date(fecha + 'T12:00:00');
+  return MESES_ES[d.getMonth()];
+}
+
+async function getOrCreateMonthFolder(groupFolderId, mesNombre) {
+  // Look for existing month folder inside group folder
+  const q = `name='${mesNombre}' and '${groupFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+  if (r.files && r.files.length > 0) return r.files[0].id;
+  // Create the month folder
+  const c = await driveApi('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name: mesNombre, mimeType: 'application/vnd.google-apps.folder', parents: [groupFolderId] })
+  });
+  return c.id;
+}
+
 async function confirmarSubidaDrive(){
   if(!pendingBlob||!pendingName)return;
   const sel=Array.from(document.querySelectorAll('#dfmBody input[type=checkbox]:checked')).map(c=>c.value);
@@ -1020,11 +1043,18 @@ async function confirmarSubidaDrive(){
   const confirmBtn=document.getElementById('dfmConfirmBtn');
   confirmBtn.disabled=true;confirmBtn.textContent='⏳ Subiendo...';
   let ok=0;
+  const mesNombre = getMesCarpeta();
+  const grupoNamesLower = ALL_GRUPOS.map(g=>g.toLowerCase());
   for(const name of sel){
     try{
       const fid=driveRootFolders[name.toLowerCase()];if(!fid)continue;
+      // Use monthly subfolder for group folders; direct upload for activity folders
+      let targetFid = fid;
+      if(mesNombre && grupoNamesLower.includes(name.toLowerCase())) {
+        targetFid = await getOrCreateMonthFolder(fid, mesNombre);
+      }
       const form=new FormData();
-      form.append('metadata',new Blob([JSON.stringify({name:pendingName+'.pdf',parents:[fid],mimeType:'application/pdf'})],{type:'application/json'}));
+      form.append('metadata',new Blob([JSON.stringify({name:pendingName+'.pdf',parents:[targetFid],mimeType:'application/pdf'})],{type:'application/json'}));
       form.append('file',pendingBlob);
       const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${gAccessToken}`},body:form});
       const d=await r.json();if(d.id)ok++;
@@ -1033,6 +1063,24 @@ async function confirmarSubidaDrive(){
   cerrarDriveFolderModal();
   showToast(ok>0?`✓ "${pendingName}" subido a ${ok} carpeta${ok>1?'s':''}`:'Error al subir');
   confirmBtn.disabled=false;
+  // Delete _sync.json from group folder(s) after successful upload
+  if(ok>0) deleteSyncFiles(sel).catch(()=>{});
+}
+
+async function deleteSyncFiles(uploadedFolderNames) {
+  // Only delete from GROUP folders (not activity folders)
+  const groupNames = uploadedFolderNames.filter(n => ALL_GRUPOS.map(g=>g.toLowerCase()).includes(n.toLowerCase()));
+  for (const name of groupNames) {
+    try {
+      const fid = driveRootFolders[name.toLowerCase()];
+      if (!fid) continue;
+      const q = `name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
+      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+      for (const file of (s.files||[])) {
+        await driveApi(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE' });
+      }
+    } catch(e) {}
+  }
 }
 
 // ══════════════════════════════════════════════════════
