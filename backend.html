@@ -233,6 +233,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
       <div class="nav-item" onclick="showPage('turnos')" data-page="turnos">
         <span class="nav-icon">🔀</span> Configurar turnos
       </div>
+      <div class="nav-item" onclick="showPage('usuarios')" data-page="usuarios">
+        <span class="nav-icon">🔑</span> Usuarios y accesos
+      </div>
       <div class="nav-item" onclick="showPage('drive')" data-page="drive">
         <span class="nav-icon">📁</span> Carpeta de Drive
       </div>
@@ -322,6 +325,13 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
       </div>
     </div>
 
+    <!-- USUARIOS -->
+    <div class="page" id="page-usuarios">
+      <div class="page-title">Usuarios y accesos</div>
+      <div class="page-sub">Cada grupo tiene un mail y contraseña para entrar a la hoja de planificación.</div>
+      <div id="usuariosList"></div>
+    </div>
+
     <!-- CORRECCIÓN -->
     <div class="page" id="page-correccion">
       <div class="page-title">Corregir planificaciones</div>
@@ -395,6 +405,14 @@ const MOADON_DEFAULT = {
   ],
   tiposMomento: ['Recibimiento','Traslado','Juego','Merienda','Cierre'],
   turnos: { t1: 'Tarde', t2: 'Nocturna', t2activo: true },
+  usuarios: {
+    Leshatef: { email: 'leshatef.cissab@gmail.com', pw: 'leshatef' },
+    Meretz:   { email: 'cissabmeretz@gmail.com',   pw: 'meretz' },
+    Teshuka:  { email: 'teshukacissab@gmail.com',  pw: 'teshuka' },
+    Letamid:  { email: 'letamid26@gmail.com',      pw: 'letamid' },
+    Nitzajon: { email: 'nitzajoncissab@gmail.com', pw: 'nitzajon' },
+    Mejudash: { email: 'mejudashcissab@gmail.com', pw: 'mejudash' },
+  },
   driveConfigured: true,
 };
 
@@ -403,6 +421,7 @@ const EMPTY_CONFIG = {
   tiposActividad: [],
   tiposMomento: ['Recibimiento','Traslado','Juego','Merienda','Cierre'],
   turnos: { t1: 'Turno 1', t2: '', t2activo: false },
+  usuarios: {},
   driveConfigured: false,
 };
 
@@ -497,6 +516,7 @@ function renderAll() {
   renderActividades();
   renderMomentos();
   renderTurnos();
+  renderUsuarios();
 }
 
 // ══════════════════════════════════════════════════════
@@ -567,6 +587,7 @@ function agregarMadrij(grupo, input) {
   config.grupos[grupo].push(nombre);
   input.value = '';
   markUnsaved();
+  renderUsuarios();
   // Keep this group open after re-render
   renderGrupos(new Set([grupo]));
   // Re-focus input
@@ -586,6 +607,41 @@ function quitarMadrij(grupo, madrij) {
 // TIPOS DE ACTIVIDAD
 // ══════════════════════════════════════════════════════
 const COLORES_ACTIVIDAD = ['#3b82f6','#22c55e','#8b5cf6','#ef4444','#1f2937','#f59e0b','#ec4899','#14b8a6'];
+
+function renderUsuarios() {
+  if (!config.usuarios) config.usuarios = {};
+  const list = document.getElementById('usuariosList');
+  if (!list) return;
+  list.innerHTML = '';
+  Object.keys(config.grupos).forEach(grupo => {
+    const u = config.usuarios[grupo] || { email: '', pw: '' };
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.padding = '16px';
+    card.innerHTML = `
+      <div class="card-title" style="margin-bottom:12px;">👥 ${escBe(grupo)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="field-label">Mail de acceso</div>
+          <input class="field-input" value="${escBe(u.email||'')}" placeholder="mail@grupo.com"
+            oninput="setUsuario('${escBe(grupo)}','email',this.value)"/>
+        </div>
+        <div>
+          <div class="field-label">Contraseña</div>
+          <input class="field-input" value="${escBe(u.pw||'')}" placeholder="contraseña"
+            oninput="setUsuario('${escBe(grupo)}','pw',this.value)"/>
+        </div>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function setUsuario(grupo, field, value) {
+  if (!config.usuarios) config.usuarios = {};
+  if (!config.usuarios[grupo]) config.usuarios[grupo] = { email: '', pw: '' };
+  config.usuarios[grupo][field] = value;
+  markUnsaved();
+}
 
 function renderActividades() {
   const list = document.getElementById('actividadesList');
@@ -693,13 +749,9 @@ let beAreaFolderId = null;
 
 
 function mostrarDrivePrompt() {
-  // Show only once per device per user account
-  const key = 'be_drive_prompted_' + (beUser ? beUser.email : '');
-  if (localStorage.getItem(key)) {
-    // Already connected before - try silent reconnect
-    silentReconnectDrive();
-    return;
-  }
+  // Always show Drive prompt on login
+  // Try silent reconnect in background - if it works, dismiss popup automatically
+  silentReconnectDrive();
   document.getElementById('drivePromptModal').style.display = 'flex';
 }
 
@@ -722,10 +774,14 @@ function silentReconnectDrive() {
       client_id: BE_GDRIVE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/drive',
       callback: async (resp) => {
-        if (resp.error) return; // silent fail
+        if (resp.error) return;
         beGAccessToken = resp.access_token;
         await initBeAreaFolder();
+        await cargarConfigDesdeDrive();
         updateDriveStatusBe();
+        // Auto-dismiss Drive prompt if silent reconnect succeeded
+        const modal = document.getElementById('drivePromptModal');
+        if (modal) modal.style.display = 'none';
       }
     });
   }
@@ -742,9 +798,11 @@ function conectarDriveBe() {
         if (resp.error) { showToastBe('Error Google: ' + resp.error); return; }
         beGAccessToken = resp.access_token;
         await initBeAreaFolder();
-        // Load latest config from Drive and apply to backend UI
         await cargarConfigDesdeDrive();
         updateDriveStatusBe();
+        // Dismiss Drive prompt
+        const _pm = document.getElementById('drivePromptModal');
+        if (_pm) _pm.style.display = 'none';
         if (document.getElementById('page-correccion').classList.contains('active')) loadExplorer();
       }
     });
