@@ -581,25 +581,27 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .tipo-act-chip[data-tipo="Actividad de Terror"].active    { background:#1f2937; }
 
 
-.custom-tipo-textarea {
-  display:block;
-  width:100%;
-  margin-top:4px;
-  border:none;
-  border-bottom:1.5px solid #c084fc;
-  background:transparent;
-  font-family:'DM Sans',sans-serif;
-  font-size:12px;
-  font-weight:600;
-  color:#6b21a8;
-  outline:none;
-  resize:none;
-  overflow:hidden;
-  min-height:22px;
-  line-height:1.4;
-  padding:2px 0;
+.tipo-personalizado-btn {
+  white-space:normal !important;
+  word-break:break-word;
+  align-items:flex-start !important;
+  height:auto !important;
+  max-width:100%;
 }
-.custom-tipo-textarea::placeholder { color:#c084fc; font-weight:400; }
+.custom-tipo-editable {
+  outline:none;
+  min-width:40px;
+  flex:1;
+  line-height:1.4;
+  word-break:break-word;
+  white-space:pre-wrap;
+}
+.custom-tipo-editable:empty::before {
+  content:attr(data-placeholder);
+  color:#c084fc;
+  font-weight:400;
+  pointer-events:none;
+}
 
 </style>
 </head>
@@ -1752,15 +1754,19 @@ function renderAll(){
 
       <div class="mcell">
         <div class="tipo-wrap">
-          <button class="tipo-badge tipo-${m.tipo}" onclick="toggleDD(${m.id},this)">
+          <button class="tipo-badge tipo-${m.tipo}${m.tipo==='Personalizado'?' tipo-personalizado-btn':''}" onclick="toggleDD(${m.id},this)">
             ${m.tipo==='Personalizado'
-              ? `✏ Personalizado <span class="arrow">▾</span>`
+              ? `<span class="custom-tipo-editable" contenteditable="true"
+                  onclick="event.stopPropagation()"
+                  onkeydown="event.stopPropagation()"
+                  oninput="event.stopPropagation();upd(${m.id},'customTipo',this.innerText)"
+                  data-placeholder="Nombrar momento..."
+                >${esc(m.customTipo||'')}</span><span class="arrow" style="flex-shrink:0;align-self:flex-start;margin-top:2px;">▾</span>`
               : `${m.tipo} <span class="arrow">▾</span>`}
           </button>
           <div class="tipo-dropdown" id="dd-${m.id}">
             ${TIPOS.map(t=>`<button class="tipo-opt" onclick="setTipo(${m.id},'${t}')">${t}</button>`).join('')}
           </div>
-          ${m.tipo==='Personalizado' ? `<textarea class="custom-tipo-textarea" placeholder="Nombre del momento..." oninput="upd(${m.id},'customTipo',this.value);autoResize(this)" onclick="event.stopPropagation()">${esc(m.customTipo||'')}</textarea>` : ''}
         </div>
       </div>
 
