@@ -1754,16 +1754,20 @@ function renderAll(){
 
       <div class="mcell">
         <div class="tipo-wrap">
-          <button class="tipo-badge tipo-${m.tipo}${m.tipo==='Personalizado'?' tipo-personalizado-btn':''}" onclick="toggleDD(${m.id},this)">
-            ${m.tipo==='Personalizado'
-              ? `<span class="custom-tipo-editable" contenteditable="true"
+          ${m.tipo==='Personalizado'
+            ? `<div class="tipo-badge tipo-Personalizado tipo-personalizado-btn" onclick="toggleDD(${m.id},this)">
+                <span class="custom-tipo-editable" contenteditable="true"
                   onclick="event.stopPropagation()"
                   onkeydown="event.stopPropagation()"
+                  onkeyup="event.stopPropagation()"
+                  onkeypress="event.stopPropagation()"
                   oninput="event.stopPropagation();upd(${m.id},'customTipo',this.innerText)"
                   data-placeholder="Nombrar momento..."
-                >${esc(m.customTipo||'')}</span><span class="arrow" style="flex-shrink:0;align-self:flex-start;margin-top:2px;">▾</span>`
-              : `${m.tipo} <span class="arrow">▾</span>`}
-          </button>
+                >${esc(m.customTipo||'')}</span><span class="arrow" style="flex-shrink:0;align-self:flex-start;margin-top:2px;">▾</span>
+              </div>`
+            : `<button class="tipo-badge tipo-${m.tipo}" onclick="toggleDD(${m.id},this)">
+                ${m.tipo} <span class="arrow">▾</span>
+              </button>`}
           <div class="tipo-dropdown" id="dd-${m.id}">
             ${TIPOS.map(t=>`<button class="tipo-opt" onclick="setTipo(${m.id},'${t}')">${t}</button>`).join('')}
           </div>
