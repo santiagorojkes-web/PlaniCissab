@@ -945,33 +945,49 @@ async function subirConfigJson() {
   // Find existing _config.json
   const q = `name='_config.json' and '${beAreaFolderId}' in parents and trashed=false`;
   const s = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify({
-    name: '_config.json', parents: [beAreaFolderId], mimeType: 'application/json'
-  })], { type: 'application/json' }));
-  form.append('file', blob);
+
+  let fileId = null;
 
   if (s.files && s.files.length > 0) {
-    // Update existing — make it publicly readable
-    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${s.files[0].id}?uploadType=multipart`, {
-      method: 'PATCH', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: form
-    });
-    // Set public readable (non-fatal if fails due to org restrictions)
-    try { await beApi(`https://www.googleapis.com/drive/v3/files/${s.files[0].id}/permissions`, {
+    // UPDATE: don't include 'parents' in metadata — that causes the PATCH to fail
+    fileId = s.files[0].id;
+    const updateForm = new FormData();
+    updateForm.append('metadata', new Blob([JSON.stringify({
+      name: '_config.json', mimeType: 'application/json'
+      // NO 'parents' here — file already exists
+    })], { type: 'application/json' }));
+    updateForm.append('file', blob);
+    const upResp = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+      { method: 'PATCH', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: updateForm }
+    );
+    if (!upResp.ok) {
+      const err = await upResp.text();
+      throw new Error('Error al actualizar _config.json: ' + err);
+    }
+  } else {
+    // CREATE: include 'parents' only when creating
+    const createForm = new FormData();
+    createForm.append('metadata', new Blob([JSON.stringify({
+      name: '_config.json', parents: [beAreaFolderId], mimeType: 'application/json'
+    })], { type: 'application/json' }));
+    createForm.append('file', blob);
+    const crResp = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: createForm }
+    );
+    const created = await crResp.json();
+    if (!created.id) throw new Error('No se pudo crear _config.json');
+    fileId = created.id;
+  }
+
+  // Make publicly readable (non-fatal if org restricts it)
+  try {
+    await beApi(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ role: 'reader', type: 'anyone' })
-    }); } catch(e) {}
-  } else {
-    const created = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: form
-    }).then(r => r.json());
-    if (created.id) {
-      try { await beApi(`https://www.googleapis.com/drive/v3/files/${created.id}/permissions`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ role: 'reader', type: 'anyone' })
-      }); } catch(e) {}
-    }
-  }
+    });
+  } catch(e) {}
 }
 
 // ══════════════════════════════════════════════════════
