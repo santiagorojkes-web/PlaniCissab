@@ -441,13 +441,22 @@ function afterBeLogin() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appShell').style.display = 'block';
   document.getElementById('sidebarArea').textContent = beUser.area;
-  config = beUser.area === 'Moadon'
-    ? JSON.parse(JSON.stringify(MOADON_DEFAULT))
-    : JSON.parse(JSON.stringify(EMPTY_CONFIG));
-  showPage('grupos'); // Always start here
+
+  // Start with cached local config, or default if none
+  const cached = localStorage.getItem('cissab_area_config_' + beUser.area);
+  if (cached) {
+    try { config = JSON.parse(cached); }
+    catch(e) { config = beUser.area === 'Moadon' ? JSON.parse(JSON.stringify(MOADON_DEFAULT)) : JSON.parse(JSON.stringify(EMPTY_CONFIG)); }
+  } else {
+    config = beUser.area === 'Moadon'
+      ? JSON.parse(JSON.stringify(MOADON_DEFAULT))
+      : JSON.parse(JSON.stringify(EMPTY_CONFIG));
+  }
+
+  showPage('grupos');
   renderAll();
-  // Request Drive connection after a short delay
-  setTimeout(mostrarDrivePrompt, 800);
+  // Always ask to connect Drive to load latest config
+  setTimeout(mostrarDrivePrompt, 600);
 }
 
 function beLogout() {
@@ -733,6 +742,8 @@ function conectarDriveBe() {
         if (resp.error) { showToastBe('Error Google: ' + resp.error); return; }
         beGAccessToken = resp.access_token;
         await initBeAreaFolder();
+        // Load latest config from Drive and apply to backend UI
+        await cargarConfigDesdeDrive();
         updateDriveStatusBe();
         if (document.getElementById('page-correccion').classList.contains('active')) loadExplorer();
       }
@@ -767,6 +778,27 @@ async function initBeAreaFolder() {
   }
 }
 
+
+async function cargarConfigDesdeDrive() {
+  if (!beGAccessToken || !beAreaFolderId) return;
+  try {
+    const q = `name='_config.json' and '${beAreaFolderId}' in parents and trashed=false`;
+    const r = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,modifiedTime)`);
+    if (!r.files || !r.files.length) return;
+    const resp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${r.files[0].id}?alt=media`,
+      { headers: { Authorization: `Bearer ${beGAccessToken}` } }
+    );
+    const driveConfig = await resp.json();
+    if (driveConfig && driveConfig.grupos) {
+      config = driveConfig;
+      // Save to localStorage so other devices can use it
+      localStorage.setItem('cissab_area_config_' + beUser.area, JSON.stringify(config));
+      renderAll();
+      showToastBe('✓ Config cargada desde Drive');
+    }
+  } catch(e) { /* use local config if Drive load fails */ }
+}
 function updateDriveStatusBe() {
   const el = document.getElementById('driveStatusBe');
   const card = document.getElementById('driveConfigCard');
@@ -800,7 +832,10 @@ async function guardarConfig() {
     try {
       await crearCarpetasFaltantes();
       await subirConfigJson();
-      showToastBe('✓ Configuración guardada en Drive');
+      // Also save to localStorage for instant update on this device
+      localStorage.setItem('cissab_area_config_' + beUser.area, JSON.stringify(config));
+      localStorage.setItem('cissab_area_config_ts_' + beUser.area, new Date().toISOString());
+      showToastBe('✓ Configuración guardada en Drive y aplicada en la hoja');
       markSaved();
     } catch(e) {
       showToastBe('Error al guardar: ' + e.message);
@@ -809,9 +844,10 @@ async function guardarConfig() {
       btn.disabled = false;
     }
   } else {
-    // Save locally only
-    localStorage.setItem('be_config_' + beUser.area, JSON.stringify(config));
-    showToastBe('✓ Guardado localmente (conectá Drive para sincronizar)');
+    // Save to localStorage (shared with madrijim sheet on same domain)
+    localStorage.setItem('cissab_area_config_' + beUser.area, JSON.stringify(config));
+    localStorage.setItem('cissab_area_config_ts_' + beUser.area, new Date().toISOString());
+    showToastBe('✓ Config guardada — se aplica en la hoja al instante en este dispositivo. Conectá Drive para sincronizar entre dispositivos.');
     markSaved();
   }
 }
@@ -841,7 +877,7 @@ async function crearCarpetasFaltantes() {
     });
     if (created.id) existing.add(nombre.toLowerCase()); // update local set
   }
-  if (toCreate.length) showToastBe(`✓ ${toCreate.length} carpeta(s) creada(s) en Drive`);
+  if (toCreate.length) showToastBe(`✓ Carpeta(s) nueva(s) en Drive: ${toCreate.join(', ')}`);
 }
 
 async function subirConfigJson() {
