@@ -866,14 +866,19 @@ function toggleGrupo(g) {
   if(g==='General'){
     selectedGrupos=selectedGrupos[0]==='General'?[]:['General'];
     if(selectedGrupos[0]==='General'){
-      const ta=document.getElementById('tipoActividad');
-      if(ta){ta.value='Actividad General';onTipoActChange();}
+      // Auto-select Actividades Generales folder when uploading
     }
   } else {
     selectedGrupos=selectedGrupos.filter(x=>x!=='General');
     selectedGrupos.includes(g)?selectedGrupos=selectedGrupos.filter(x=>x!==g):selectedGrupos.push(g);
   }
-  renderGrupoChips(); updateMadrijimFromGrupos(); saveAll();
+  renderGrupoChips(); updateMadrijimFromGrupos();
+  // Clear role/material assignments since team changed
+  momentos.forEach(m => {
+    (m.materiales||[]).forEach(it => { it.asignados = []; });
+    (m.roles||[]).forEach(it => { it.asignados = []; });
+  });
+  renderAll(); saveAll();
 }
 
 function updateMadrijimFromGrupos() {
@@ -910,7 +915,10 @@ function getNombreArchivo(){
   const grupo=getGrupoNombre();
   const tipoShort=getTipoActShort();
   if(selectedGrupos[0]==='General')return('General '+fechaStr).trim();
-  if(tipoShort==='Jag')return(grupo+' Jag '+fechaStr).trim();
+  if(tipoShort==='Jag'){
+    const jt=(document.getElementById('jagText')||{}).value||'';
+    return(grupo+' '+(jt.trim()||'Jag')+' '+fechaStr).trim();
+  }
   return[grupo,tipoShort,fechaStr].filter(Boolean).join(' ');
 }
 
@@ -918,7 +926,7 @@ function getNombreArchivo(){
 // DRIVE ACTIVITY FOLDERS & FOLDER SELECTOR
 // ══════════════════════════════════════════════════════
 
-const TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad General','Actividad Jaguim','Actividad Picante','Actividad de Terror'];
+const TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad Jaguim','Actividad Picante','Actividad de Terror'];
 let selectedTipoAct = '';
 
 function renderTipoActChips() {
@@ -985,11 +993,11 @@ function abrirDriveFolderModal(){
   const actFolder=ACTIVITY_FOLDER_MAP[tipoAct]||'';
   const pre=new Set();
   selectedGrupos.forEach(g=>{if(g!=='General')pre.add(g.toLowerCase());});
-  if(selectedGrupos[0]==='General')pre.add('actividades generales');
-  if(actFolder)pre.add(actFolder.toLowerCase());
-  // Admins: no pre-selection (they can pick manually)
+  if(selectedGrupos[0]==='General') pre.add('actividades generales');
+  if(actFolder) pre.add(actFolder.toLowerCase());
   const allNames=Object.keys(driveRootFolders);
-  const grpF=ALL_GRUPOS.filter(g=>allNames.includes(g.toLowerCase()));
+  // Always show ALL groups (folder created on upload if needed)
+  const grpF=ALL_GRUPOS;
   const actF=ACTIVITY_FOLDERS.filter(af=>allNames.includes(af.toLowerCase()));
   let html='';
   if(grpF.length){
@@ -1036,27 +1044,42 @@ async function confirmarSubidaDrive(){
 const SYNC_FILE='_sync.json';
 
 async function sincronizarDesdeDrive() {
-  // Need Drive auth first
+  closeModal();
+  // If no token, auth first then auto-load
   if (!gAccessToken) {
-    showToast('Primero autenticate con Google usando el botón "Subir Planificación"');
-    closeModal();
+    showToast('☁️ Conectando con Google Drive...');
+    // Set a flag so after auth we load instead of upload
+    window._pendingSync = true;
+    iniciarGoogleAuth();
     return;
   }
-  closeModal();
+  await _doLoadFromDrive();
+}
+
+async function _doLoadFromDrive() {
   showToast('☁️ Cargando desde Drive...');
-  const data = await loadFromDrive();
-  if (data) {
-    applySyncData(data);
-    showToast('✓ Planificación cargada desde Drive');
-  } else {
-    showToast('No se encontró ninguna planificación en Drive');
+  try {
+    const data = await loadFromDrive();
+    if (data) {
+      applySyncData(data);
+      showToast('✓ Planificación cargada desde Drive');
+    } else {
+      showToast('No hay planificación guardada en Drive para este grupo');
+    }
+  } catch(e) {
+    showToast('Error al cargar desde Drive: ' + e.message);
   }
 }
 
 async function syncToDrive(){
   if(!gAccessToken||!selectedGrupos.length)return;
   try{
-    const gn=getGrupoNombre();const fid=driveRootFolders[gn.toLowerCase()];if(!fid)return;
+    const gn=getGrupoNombre();
+    // Ensure folder exists (creates if missing)
+    let fid=driveRootFolders[gn.toLowerCase()];
+    if(!fid){ await ensureActivityFolders(); fid=driveRootFolders[gn.toLowerCase()]; }
+    if(!fid){ fid = await buscarCarpetaGrupo(gn); driveRootFolders[gn.toLowerCase()]=fid; }
+    if(!fid)return;
     const data={_sync:true,ts:Date.now(),selectedGrupos,madrijim,momentos,fields:{}};
     ['grupo','fecha','tema','contenido','objetivo','hilo','tipoActividad','jagText'].forEach(id=>{const el=document.getElementById(id);if(el)data.fields[id]=el.value||'';});
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
@@ -1075,7 +1098,9 @@ async function loadFromDrive(){
   try{
     await ensureActivityFolders();
     const gn=getGrupoNombre()||(currentUser&&currentUser.grupo)||'';
-    const fid=driveRootFolders[gn.toLowerCase()];if(!fid)return null;
+    let fid=driveRootFolders[gn.toLowerCase()];
+    if(!fid){ fid = await buscarCarpetaGrupo(gn); driveRootFolders[gn.toLowerCase()]=fid; }
+    if(!fid)return null;
     const q=`name='${SYNC_FILE}' and '${fid}' in parents and trashed=false`;
     const s=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
     if(!s.files||!s.files.length)return null;
@@ -1332,6 +1357,7 @@ function iniciarGoogleAuth() {
         gAccessToken = resp.access_token;
         // Create activity folders eagerly
         ensureActivityFolders().catch(()=>{});
+        if (window._pendingSync) { window._pendingSync = false; await _doLoadFromDrive(); return; }
         if (driveUploadPending) { driveUploadPending = false; await ejecutarSubida(); }
       }
     });
