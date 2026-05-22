@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PlanniCissab — Backend Coordinadores</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --accent:#e8630a; --accent-dark:#c4510a; --accent-light:#fff3eb;
+  --bg:#faf9f7; --surface:#ffffff; --border:#e8e4df; --border-strong:#d4cdc6;
+  --text:#1a1917; --text-muted:#6b6560; --text-faint:#a8a09a;
+  --green:#16a34a; --green-bg:#dcfce7;
+  --blue:#2563eb; --blue-bg:#dbeafe;
+  --purple:#7c3aed; --purple-bg:#ede9fe;
+  --red:#dc2626; --red-bg:#fee2e2;
+  --sidebar-w:240px;
+}
+
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* ── LOGIN ── */
+#loginScreen {
+  position:fixed; inset:0; background:var(--accent);
+  display:flex; align-items:center; justify-content:center; z-index:9999;
+}
+.login-box {
+  background:#fff; border-radius:20px; padding:40px 36px;
+  width:400px; max-width:calc(100vw - 32px);
+  box-shadow:0 24px 64px rgba(0,0,0,.2);
+}
+.login-logo { text-align:center; margin-bottom:6px; font-size:28px; font-weight:800; color:var(--accent); }
+.login-sub { text-align:center; font-size:13px; color:var(--text-muted); margin-bottom:28px; }
+.login-field { margin-bottom:14px; }
+.login-label { display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); margin-bottom:5px; }
+.login-input { width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:14px; font-family:'DM Sans',sans-serif; outline:none; transition:border-color .15s; }
+.login-input:focus { border-color:var(--accent); }
+.login-btn { width:100%; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px; font-size:15px; font-weight:700; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:8px; }
+.login-btn:hover { background:var(--accent-dark); }
+.login-error { color:var(--red); font-size:12px; text-align:center; margin-top:8px; min-height:16px; }
+
+/* ── APP SHELL ── */
+#appShell { display:none; height:100vh; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  position:fixed; top:0; left:0; bottom:0; width:var(--sidebar-w);
+  background:var(--text); color:#fff; display:flex; flex-direction:column;
+  z-index:100;
+}
+.sidebar-header { padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,.1); }
+.sidebar-logo { font-size:16px; font-weight:800; color:#fff; }
+.sidebar-area { font-size:11px; color:rgba(255,255,255,.5); margin-top:3px; }
+.sidebar-nav { flex:1; padding:12px 0; overflow-y:auto; }
+.nav-item {
+  display:flex; align-items:center; gap:10px; padding:10px 20px;
+  font-size:13px; font-weight:500; color:rgba(255,255,255,.65);
+  cursor:pointer; transition:all .12s; border-left:3px solid transparent;
+}
+.nav-item:hover { color:#fff; background:rgba(255,255,255,.07); }
+.nav-item.active { color:#fff; background:rgba(232,99,10,.2); border-left-color:var(--accent); }
+.nav-icon { font-size:16px; flex-shrink:0; }
+.sidebar-footer { padding:16px 20px; border-top:1px solid rgba(255,255,255,.1); }
+.logout-btn { font-size:12px; color:rgba(255,255,255,.45); cursor:pointer; background:none; border:none; font-family:'DM Sans',sans-serif; }
+.logout-btn:hover { color:rgba(255,255,255,.8); }
+
+/* ── MAIN CONTENT ── */
+.main { margin-left:var(--sidebar-w); padding:32px; min-height:100vh; }
+.page { display:none; }
+.page.active { display:block; }
+.page-title { font-size:22px; font-weight:800; margin-bottom:4px; }
+.page-sub { font-size:13px; color:var(--text-muted); margin-bottom:28px; }
+
+/* ── CARDS ── */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:20px; }
+.card-title { font-size:14px; font-weight:700; margin-bottom:4px; }
+.card-sub { font-size:12px; color:var(--text-muted); margin-bottom:16px; }
+
+/* ── TAGS/CHIPS editable ── */
+.tags-wrap { display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-height:36px; border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+.tag { display:inline-flex; align-items:center; gap:5px; background:var(--bg); border:1px solid var(--border-strong); border-radius:20px; padding:3px 10px; font-size:12px; font-weight:500; }
+.tag-del { background:none; border:none; cursor:pointer; color:var(--text-faint); font-size:14px; line-height:1; padding:0 2px; }
+.tag-del:hover { color:var(--red); }
+.tag-add-input { border:none; outline:none; font-size:12px; font-family:'DM Sans',sans-serif; background:transparent; min-width:100px; }
+
+/* ── INPUT / SELECT ── */
+.field-row { display:flex; gap:10px; align-items:flex-start; margin-bottom:12px; }
+.field-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); margin-bottom:5px; }
+.field-input { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px; font-family:'DM Sans',sans-serif; outline:none; transition:border-color .15s; background:var(--surface); }
+.field-input:focus { border-color:var(--accent); }
+.field-select { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px; font-family:'DM Sans',sans-serif; outline:none; background:var(--surface); cursor:pointer; }
+
+/* ── GRUPOS TABLE ── */
+.grupos-list { display:flex; flex-direction:column; gap:10px; }
+.grupo-row { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.grupo-header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg); cursor:pointer; }
+.grupo-nombre { font-weight:600; font-size:14px; flex:1; }
+.grupo-body { padding:14px; border-top:1px solid var(--border); display:none; }
+.grupo-body.open { display:block; }
+.grupo-actions { display:flex; gap:6px; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid var(--border-strong); background:var(--surface); color:var(--text); transition:all .12s; }
+.btn:hover { background:var(--bg); }
+.btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn.primary:hover { background:var(--accent-dark); }
+.btn.danger { color:var(--red); border-color:#fca5a5; }
+.btn.danger:hover { background:var(--red-bg); }
+.btn.success { background:var(--green); color:#fff; border-color:var(--green); }
+
+/* ── TURNOS ── */
+.turno-config { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+/* ── DRIVE SECTION ── */
+.drive-status { display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:10px; font-size:13px; margin-bottom:16px; }
+.drive-status.connected { background:var(--green-bg); color:var(--green); }
+.drive-status.disconnected { background:var(--red-bg); color:var(--red); }
+
+/* ── CORRECCIÓN ── */
+.explorer { border:1px solid var(--border); border-radius:10px; overflow:hidden; min-height:200px; }
+.explorer-header { background:var(--bg); padding:10px 14px; font-size:12px; font-weight:600; color:var(--text-muted); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+.explorer-list { padding:8px 0; }
+.explorer-item { display:flex; align-items:center; gap:10px; padding:8px 14px; cursor:pointer; font-size:13px; transition:background .1s; }
+.explorer-item:hover { background:var(--bg); }
+.explorer-item-icon { font-size:16px; flex-shrink:0; }
+.explorer-item-name { flex:1; }
+.explorer-item-meta { font-size:11px; color:var(--text-faint); }
+.explorer-empty { padding:32px; text-align:center; color:var(--text-faint); font-size:13px; }
+
+/* ── CORRECCIÓN VIEWER ── */
+#correctionViewer { display:none; }
+.correction-momento { border:1px solid var(--border); border-radius:10px; margin-bottom:16px; overflow:hidden; }
+.correction-momento-header { background:var(--bg); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; }
+.correction-momento-body { padding:16px; }
+.correction-field { margin-bottom:10px; }
+.correction-field-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--accent); margin-bottom:4px; }
+.correction-field-val { font-size:13px; color:var(--text); line-height:1.5; }
+.comment-wrap { margin-top:10px; }
+.comment-existing { background:#fef3c7; border-left:3px solid #f59e0b; border-radius:4px; padding:8px 12px; font-size:12px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.comment-text { flex:1; line-height:1.4; color:#78350f; }
+.comment-del { background:none; border:none; cursor:pointer; color:#a16207; font-size:14px; }
+.add-comment-row { display:flex; gap:6px; margin-top:6px; }
+.add-comment-input { flex:1; border:1px solid #fcd34d; border-radius:6px; padding:6px 10px; font-size:12px; font-family:'DM Sans',sans-serif; outline:none; background:#fffbeb; }
+.add-comment-btn { background:#f59e0b; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; }
+
+/* ── TOAST ── */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1a1917; color:#fff; padding:10px 20px; border-radius:10px; font-size:13px; font-weight:500; z-index:99999; opacity:0; transition:opacity .2s; pointer-events:none; }
+.toast.show { opacity:1; }
+
+/* ── SAVE BAR ── */
+.save-bar { position:fixed; bottom:0; left:var(--sidebar-w); right:0; background:var(--surface); border-top:1px solid var(--border); padding:12px 32px; display:flex; align-items:center; justify-content:space-between; z-index:50; }
+.save-bar-info { font-size:12px; color:var(--text-muted); }
+.unsaved-dot { display:inline-block; width:7px; height:7px; background:var(--accent); border-radius:50%; margin-right:6px; }
+
+@media(max-width:768px){
+  :root { --sidebar-w:0px; }
+  .sidebar { display:none; }
+  .main { margin-left:0; padding:16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">PlanniCissab</div>
+    <div class="login-sub">Panel de Coordinadores</div>
+    <div class="login-field">
+      <label class="login-label">Mail</label>
+      <input class="login-input" type="email" id="beEmail" placeholder="coordinador@cissab.org.ar" autocomplete="email"/>
+    </div>
+    <div class="login-field">
+      <label class="login-label">Contraseña</label>
+      <input class="login-input" type="password" id="bePass" placeholder="••••••••" onkeydown="if(event.key==='Enter')beLogin()"/>
+    </div>
+    <div class="login-error" id="beError"></div>
+    <button class="login-btn" onclick="beLogin()">Entrar al backend</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">⚙ Backend</div>
+      <div class="sidebar-area" id="sidebarArea">—</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('grupos')" data-page="grupos">
+        <span class="nav-icon">👥</span> Grupos y Madrijim
+      </div>
+      <div class="nav-item" onclick="showPage('actividades')" data-page="actividades">
+        <span class="nav-icon">🎯</span> Tipos de actividad
+      </div>
+      <div class="nav-item" onclick="showPage('momentos')" data-page="momentos">
+        <span class="nav-icon">⏱</span> Tipos de momento
+      </div>
+      <div class="nav-item" onclick="showPage('turnos')" data-page="turnos">
+        <span class="nav-icon">🔀</span> Configurar turnos
+      </div>
+      <div class="nav-item" onclick="showPage('drive')" data-page="drive">
+        <span class="nav-icon">📁</span> Carpeta de Drive
+      </div>
+      <div class="nav-item" onclick="showPage('correccion')" data-page="correccion">
+        <span class="nav-icon">✏️</span> Corregir planificaciones
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="beLogout()">⏏ Cerrar sesión</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main" style="padding-bottom:80px;">
+
+    <!-- GRUPOS -->
+    <div class="page active" id="page-grupos">
+      <div class="page-title">Grupos y Madrijim</div>
+      <div class="page-sub">Configurá los grupos del área y los madrijim de cada uno.</div>
+      <div id="gruposList" class="grupos-list"></div>
+      <button class="btn primary" onclick="agregarGrupo()" style="margin-top:8px;">+ Agregar grupo</button>
+    </div>
+
+    <!-- ACTIVIDADES -->
+    <div class="page" id="page-actividades">
+      <div class="page-title">Tipos de actividad</div>
+      <div class="page-sub">Cada tipo tiene un nombre y un color. Se crean carpetas en Drive automáticamente.</div>
+      <div id="actividadesList"></div>
+      <button class="btn primary" onclick="agregarActividad()" style="margin-top:8px;">+ Agregar tipo</button>
+    </div>
+
+    <!-- MOMENTOS -->
+    <div class="page" id="page-momentos">
+      <div class="page-title">Tipos de momento</div>
+      <div class="page-sub">Los madrijim los ven en el menú desplegable al planificar.</div>
+      <div class="card">
+        <div class="card-title">Momentos disponibles</div>
+        <div class="card-sub">Arrastrá para reordenar. El tipo "Personalizado" siempre está al final y no se puede quitar.</div>
+        <div id="momentosList" class="tags-wrap">
+          <input class="tag-add-input" placeholder="Nuevo tipo..." id="momentoInput" onkeydown="if(event.key==='Enter')agregarMomento()"/>
+        </div>
+        <button class="btn" onclick="agregarMomento()" style="margin-top:10px;">+ Agregar</button>
+      </div>
+    </div>
+
+    <!-- TURNOS -->
+    <div class="page" id="page-turnos">
+      <div class="page-title">Configurar turnos</div>
+      <div class="page-sub">Definí hasta 2 turnos. Si el segundo se llama "Domingo" la fecha se calcula como +1 día automáticamente.</div>
+      <div class="card">
+        <div class="card-title">Turno 1</div>
+        <div class="field-label">Nombre</div>
+        <input class="field-input" id="turno1Nombre" placeholder="ej: Tarde" oninput="markUnsaved()"/>
+      </div>
+      <div class="card">
+        <div class="card-title">Turno 2</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <input type="checkbox" id="turno2Activo" onchange="toggleTurno2()"/> 
+          <label for="turno2Activo" style="font-size:13px;cursor:pointer;">Habilitar segundo turno</label>
+        </div>
+        <div id="turno2Config" style="display:none;">
+          <div class="field-label">Nombre</div>
+          <input class="field-input" id="turno2Nombre" placeholder="ej: Nocturna o Domingo" oninput="markUnsaved()"/>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted);">
+            💡 Si el nombre es <b>Domingo</b>, la fecha del turno 2 se calcula automáticamente como el día siguiente al turno 1.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRIVE -->
+    <div class="page" id="page-drive">
+      <div class="page-title">Carpeta de Drive</div>
+      <div class="page-sub">Configurá la carpeta de Drive donde se guardarán las planificaciones del área.</div>
+      <div class="card">
+        <div class="card-title">Estado de conexión con Drive</div>
+        <div class="drive-status disconnected" id="driveStatusBe">
+          ⚠ No conectado a Google Drive
+        </div>
+        <button class="btn" onclick="conectarDriveBe()">🔗 Conectar con Drive</button>
+      </div>
+      <div class="card" id="driveConfigCard" style="display:none;">
+        <div class="card-title">Carpeta del área</div>
+        <div class="card-sub">La carpeta del área se encuentra automáticamente dentro de la carpeta raíz "Planificaciones". El sistema busca una subcarpeta con el nombre de tu área.</div>
+        <div id="driveAreaInfo" style="font-size:13px;color:var(--text-muted);padding:10px 0;"></div>
+      </div>
+    </div>
+
+    <!-- CORRECCIÓN -->
+    <div class="page" id="page-correccion">
+      <div class="page-title">Corregir planificaciones</div>
+      <div class="page-sub">Navegá las planificaciones subidas al Drive y dejá comentarios.</div>
+
+      <div id="correctionExplorer">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;" id="explorerBreadcrumb">
+          <span style="font-size:13px;color:var(--text-muted);">📁 Área</span>
+        </div>
+        <div class="explorer">
+          <div class="explorer-header" id="explorerHeader">Cargando...</div>
+          <div class="explorer-list" id="explorerList">
+            <div class="explorer-empty">Conectate a Drive para explorar planificaciones</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="correctionViewer">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <button class="btn" onclick="volverExplorer()">← Volver</button>
+          <span id="correctionFileName" style="font-size:14px;font-weight:700;"></span>
+          <button class="btn success" onclick="guardarCorreccion()" style="margin-left:auto;">💾 Guardar corrección</button>
+        </div>
+        <div id="correctionContent"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Save bar -->
+  <div class="save-bar">
+    <div class="save-bar-info" id="saveBarInfo">Todo guardado</div>
+    <button class="btn primary" id="saveBtn" onclick="guardarConfig()">💾 Guardar configuración</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// USUARIOS COORDINADORES
+// ══════════════════════════════════════════════════════
+const BE_USERS = [
+  { email:'moadon@cissab.org.ar',             pw:'moadon', area:'Moadon' },
+  { email:'bogrimmayor@cissab.org.ar',         pw:'lama',   area:'Bogrim Mayor' },
+  { email:'bogrimmenor@cissab.org.ar',         pw:'lame',   area:'Bogrim Menor' },
+  { email:'shorashim@cissab.org.ar',           pw:'shora',  area:'Shorashim' },
+  { email:'escuelademadrijim@cissab.org.ar',   pw:'edma',   area:'EDMA' },
+];
+
+let beUser = null;
+let unsaved = false;
+
+// ── Configuración default de Moadon (lo que ya existe) ──
+const MOADON_DEFAULT = {
+  grupos: {
+    Leshatef: ['Cami','Larsi','Manu','Lucas'],
+    Meretz:   ['Jusa','Luki','Tali','Guido'],
+    Teshuka:  ['Ema','Luana','Doby','Tomi'],
+    Letamid:  ['Marta','Kiara','Vato','Alan'],
+    Nitzajon: ['Solchu','Ezi','Martu'],
+    Mejudash: ['Valencha','Aieka','Juli'],
+  },
+  tiposActividad: [
+    { nombre:'Actividad Chill',       color:'#3b82f6', carpeta:'Actividades Chill' },
+    { nombre:'Actividad Deportiva',   color:'#22c55e', carpeta:'Actividades Deportivas' },
+    { nombre:'Actividad Jaguim',      color:'#8b5cf6', carpeta:'Actividades Jaguim' },
+    { nombre:'Actividad Picante',     color:'#ef4444', carpeta:'Actividades Picantes' },
+    { nombre:'Actividad de Terror',   color:'#1f2937', carpeta:'Actividades de Terror' },
+  ],
+  tiposMomento: ['Recibimiento','Traslado','Juego','Merienda','Cierre'],
+  turnos: { t1: 'Tarde', t2: 'Nocturna', t2activo: true },
+  driveConfigured: true,
+};
+
+const EMPTY_CONFIG = {
+  grupos: {},
+  tiposActividad: [],
+  tiposMomento: ['Recibimiento','Traslado','Juego','Merienda','Cierre'],
+  turnos: { t1: 'Turno 1', t2: '', t2activo: false },
+  driveConfigured: false,
+};
+
+let config = null;
+
+// ══════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════
+function beLogin() {
+  const email = (document.getElementById('beEmail').value||'').trim().toLowerCase();
+  const pw    = (document.getElementById('bePass').value||'').trim();
+  const err   = document.getElementById('beError');
+  const user  = BE_USERS.find(u => u.email === email && u.pw === pw);
+  if (!user) { err.textContent = 'Mail o contraseña incorrectos.'; return; }
+  err.textContent = '';
+  beUser = user;
+  localStorage.setItem('be_session', JSON.stringify({ email: user.email, pw: user.pw }));
+  afterBeLogin();
+}
+
+function tryBeAutoLogin() {
+  try {
+    const s = localStorage.getItem('be_session');
+    if (!s) return false;
+    const { email, pw } = JSON.parse(s);
+    const user = BE_USERS.find(u => u.email === email && u.pw === pw);
+    if (!user) { localStorage.removeItem('be_session'); return false; }
+    beUser = user;
+    return true;
+  } catch(e) { return false; }
+}
+
+function afterBeLogin() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+  document.getElementById('sidebarArea').textContent = beUser.area;
+  // Load config for this area
+  config = beUser.area === 'Moadon'
+    ? JSON.parse(JSON.stringify(MOADON_DEFAULT))
+    : JSON.parse(JSON.stringify(EMPTY_CONFIG));
+  renderAll();
+}
+
+function beLogout() {
+  localStorage.removeItem('be_session');
+  beUser = null; config = null;
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('beEmail').value = '';
+  document.getElementById('bePass').value = '';
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelector(`[data-page="${id}"]`).classList.add('active');
+  if (id === 'correccion' && beGAccessToken) loadExplorer();
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════════════
+function renderAll() {
+  renderGrupos();
+  renderActividades();
+  renderMomentos();
+  renderTurnos();
+}
+
+// ══════════════════════════════════════════════════════
+// GRUPOS Y MADRIJIM
+// ══════════════════════════════════════════════════════
+function renderGrupos() {
+  const list = document.getElementById('gruposList');
+  list.innerHTML = '';
+  Object.entries(config.grupos).forEach(([nombre, madrijim]) => {
+    const div = document.createElement('div');
+    div.className = 'grupo-row';
+    div.innerHTML = `
+      <div class="grupo-header" onclick="toggleGrupoBody(this)">
+        <span class="grupo-nombre">👥 ${escBe(nombre)}</span>
+        <span style="font-size:12px;color:var(--text-muted);">${madrijim.length} madrijim</span>
+        <span style="margin-left:8px;color:var(--text-faint);">▾</span>
+      </div>
+      <div class="grupo-body">
+        <div class="field-label" style="margin-bottom:6px;">Madrijim</div>
+        <div class="tags-wrap" id="tags-${escBe(nombre)}">
+          ${madrijim.map(m => `<span class="tag">${escBe(m)}<button class="tag-del" onclick="quitarMadrij('${escBe(nombre)}','${escBe(m)}')">×</button></span>`).join('')}
+          <input class="tag-add-input" placeholder="Agregar madrij..." onkeydown="if(event.key==='Enter')agregarMadrij('${escBe(nombre)}',this)"/>
+        </div>
+        <div class="grupo-actions" style="margin-top:12px;">
+          <button class="btn danger" onclick="eliminarGrupo('${escBe(nombre)}')">🗑 Eliminar grupo</button>
+        </div>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleGrupoBody(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+function agregarGrupo() {
+  const nombre = prompt('Nombre del grupo:');
+  if (!nombre || !nombre.trim()) return;
+  const n = nombre.trim();
+  if (config.grupos[n]) { showToastBe('Ese grupo ya existe'); return; }
+  config.grupos[n] = [];
+  markUnsaved();
+  renderGrupos();
+}
+
+function eliminarGrupo(nombre) {
+  if (!confirm(`¿Eliminás el grupo "${nombre}" y todos sus madrijim?`)) return;
+  delete config.grupos[nombre];
+  markUnsaved();
+  renderGrupos();
+}
+
+function agregarMadrij(grupo, input) {
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  if (!config.grupos[grupo]) config.grupos[grupo] = [];
+  if (config.grupos[grupo].includes(nombre)) { input.value=''; return; }
+  config.grupos[grupo].push(nombre);
+  input.value = '';
+  markUnsaved();
+  renderGrupos();
+}
+
+function quitarMadrij(grupo, madrij) {
+  config.grupos[grupo] = config.grupos[grupo].filter(m => m !== madrij);
+  markUnsaved();
+  renderGrupos();
+}
+
+// ══════════════════════════════════════════════════════
+// TIPOS DE ACTIVIDAD
+// ══════════════════════════════════════════════════════
+const COLORES_ACTIVIDAD = ['#3b82f6','#22c55e','#8b5cf6','#ef4444','#1f2937','#f59e0b','#ec4899','#14b8a6'];
+
+function renderActividades() {
+  const list = document.getElementById('actividadesList');
+  list.innerHTML = '';
+  config.tiposActividad.forEach((act, i) => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.padding = '16px';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${act.color};flex-shrink:0;cursor:pointer;" onclick="elegirColor(${i})" title="Cambiar color"></div>
+        <input class="field-input" value="${escBe(act.nombre)}" placeholder="Nombre del tipo..." oninput="config.tiposActividad[${i}].nombre=this.value;markUnsaved()" style="font-weight:600;"/>
+        <button class="btn danger" onclick="eliminarActividad(${i})">×</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);">Carpeta en Drive: <b>${escBe(act.carpeta||'')}</b></div>`;
+    list.appendChild(div);
+  });
+}
+
+function agregarActividad() {
+  config.tiposActividad.push({
+    nombre: 'Nueva actividad',
+    color: COLORES_ACTIVIDAD[config.tiposActividad.length % COLORES_ACTIVIDAD.length],
+    carpeta: 'Nueva actividad'
+  });
+  markUnsaved();
+  renderActividades();
+}
+
+function eliminarActividad(i) {
+  config.tiposActividad.splice(i, 1);
+  markUnsaved();
+  renderActividades();
+}
+
+function elegirColor(i) {
+  const actual = COLORES_ACTIVIDAD.indexOf(config.tiposActividad[i].color);
+  config.tiposActividad[i].color = COLORES_ACTIVIDAD[(actual + 1) % COLORES_ACTIVIDAD.length];
+  markUnsaved();
+  renderActividades();
+}
+
+// ══════════════════════════════════════════════════════
+// TIPOS DE MOMENTO
+// ══════════════════════════════════════════════════════
+function renderMomentos() {
+  const wrap = document.getElementById('momentosList');
+  // Clear existing tags (keep input)
+  Array.from(wrap.querySelectorAll('.tag')).forEach(t => t.remove());
+  const input = wrap.querySelector('.tag-add-input');
+  config.tiposMomento.forEach(m => {
+    const span = document.createElement('span');
+    span.className = 'tag';
+    span.innerHTML = `${escBe(m)}<button class="tag-del" onclick="quitarMomento('${escBe(m)}')">×</button>`;
+    wrap.insertBefore(span, input);
+  });
+  // Always add Personalizado as non-removable
+  const fixed = document.createElement('span');
+  fixed.className = 'tag';
+  fixed.style.borderStyle = 'dashed';
+  fixed.innerHTML = `✏ Personalizado`;
+  wrap.insertBefore(fixed, input);
+}
+
+function agregarMomento() {
+  const input = document.getElementById('momentoInput');
+  const val = input.value.trim();
+  if (!val || config.tiposMomento.includes(val)) { input.value=''; return; }
+  config.tiposMomento.push(val);
+  input.value = '';
+  markUnsaved();
+  renderMomentos();
+}
+
+function quitarMomento(nombre) {
+  config.tiposMomento = config.tiposMomento.filter(m => m !== nombre);
+  markUnsaved();
+  renderMomentos();
+}
+
+// ══════════════════════════════════════════════════════
+// TURNOS
+// ══════════════════════════════════════════════════════
+function renderTurnos() {
+  document.getElementById('turno1Nombre').value = config.turnos.t1 || '';
+  document.getElementById('turno2Activo').checked = !!config.turnos.t2activo;
+  document.getElementById('turno2Nombre').value = config.turnos.t2 || '';
+  document.getElementById('turno2Config').style.display = config.turnos.t2activo ? 'block' : 'none';
+}
+
+function toggleTurno2() {
+  config.turnos.t2activo = document.getElementById('turno2Activo').checked;
+  document.getElementById('turno2Config').style.display = config.turnos.t2activo ? 'block' : 'none';
+  markUnsaved();
+}
+
+// ══════════════════════════════════════════════════════
+// GOOGLE DRIVE — BACKEND
+// ══════════════════════════════════════════════════════
+const BE_GDRIVE_CLIENT_ID = '102705327045-hh3h2drnhphfccbjg9g8fm6kf2agq6ei.apps.googleusercontent.com';
+const BE_CARPETA_RAIZ_ID  = '1hiLmTa_gwzq39fmbUadm8utnhL-XiUme';
+let beGAccessToken = null;
+let beTokenClient  = null;
+let beAreaFolderId = null;
+
+function conectarDriveBe() {
+  if (!window.google) { showToastBe('Cargando Google...'); setTimeout(conectarDriveBe, 1000); return; }
+  if (!beTokenClient) {
+    beTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: BE_GDRIVE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive',
+      callback: async (resp) => {
+        if (resp.error) { showToastBe('Error Google: ' + resp.error); return; }
+        beGAccessToken = resp.access_token;
+        await initBeAreaFolder();
+        updateDriveStatusBe();
+        if (document.getElementById('page-correccion').classList.contains('active')) loadExplorer();
+      }
+    });
+  }
+  beTokenClient.requestAccessToken({ prompt: '' });
+}
+
+async function beApi(url, options={}) {
+  const resp = await fetch(url, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${beGAccessToken}` }
+  });
+  if (resp.status === 204 || resp.headers.get('content-length')==='0') return {};
+  const text = await resp.text();
+  return text ? JSON.parse(text) : {};
+}
+
+async function initBeAreaFolder() {
+  if (beAreaFolderId) return;
+  const q = `name='${beUser.area}' and '${BE_CARPETA_RAIZ_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const r = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+  if (r.files && r.files.length > 0) {
+    beAreaFolderId = r.files[0].id;
+  } else {
+    // Create area folder if missing
+    const c = await beApi('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name: beUser.area, mimeType:'application/vnd.google-apps.folder', parents:[BE_CARPETA_RAIZ_ID] })
+    });
+    beAreaFolderId = c.id;
+  }
+}
+
+function updateDriveStatusBe() {
+  const el = document.getElementById('driveStatusBe');
+  const card = document.getElementById('driveConfigCard');
+  const info = document.getElementById('driveAreaInfo');
+  if (beGAccessToken && beAreaFolderId) {
+    el.className = 'drive-status connected';
+    el.textContent = '✓ Conectado a Google Drive';
+    card.style.display = 'block';
+    info.textContent = `Área "${beUser.area}" — ID: ${beAreaFolderId}`;
+  } else {
+    el.className = 'drive-status disconnected';
+    el.textContent = '⚠ No conectado a Google Drive';
+    card.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// GUARDAR CONFIG
+// ══════════════════════════════════════════════════════
+async function guardarConfig() {
+  // Collect turno values from inputs
+  config.turnos.t1 = document.getElementById('turno1Nombre').value.trim() || 'Tarde';
+  config.turnos.t2 = document.getElementById('turno2Nombre').value.trim();
+  config.turnos.t2activo = document.getElementById('turno2Activo').checked;
+
+  // También crear carpetas en Drive para grupos y actividades nuevas
+  if (beGAccessToken && beAreaFolderId) {
+    const btn = document.getElementById('saveBtn');
+    btn.textContent = '⏳ Guardando...';
+    btn.disabled = true;
+    try {
+      await crearCarpetasFaltantes();
+      await subirConfigJson();
+      showToastBe('✓ Configuración guardada en Drive');
+      markSaved();
+    } catch(e) {
+      showToastBe('Error al guardar: ' + e.message);
+    } finally {
+      btn.textContent = '💾 Guardar configuración';
+      btn.disabled = false;
+    }
+  } else {
+    // Save locally only
+    localStorage.setItem('be_config_' + beUser.area, JSON.stringify(config));
+    showToastBe('✓ Guardado localmente (conectá Drive para sincronizar)');
+    markSaved();
+  }
+}
+
+async function crearCarpetasFaltantes() {
+  // List current folders in area
+  const q = `mimeType='application/vnd.google-apps.folder' and '${beAreaFolderId}' in parents and trashed=false`;
+  const r = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
+  const existing = new Set((r.files||[]).map(f => f.name.toLowerCase()));
+
+  const toCreate = [];
+  // Group folders
+  Object.keys(config.grupos).forEach(g => { if (!existing.has(g.toLowerCase())) toCreate.push(g); });
+  // Activity folders
+  config.tiposActividad.forEach(a => {
+    if (a.carpeta && !existing.has(a.carpeta.toLowerCase())) toCreate.push(a.carpeta);
+  });
+
+  for (const nombre of toCreate) {
+    await beApi('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name: nombre, mimeType:'application/vnd.google-apps.folder', parents:[beAreaFolderId] })
+    });
+  }
+  if (toCreate.length) showToastBe(`✓ ${toCreate.length} carpeta(s) creada(s) en Drive`);
+}
+
+async function subirConfigJson() {
+  const configData = JSON.stringify(config, null, 2);
+  const blob = new Blob([configData], { type: 'application/json' });
+
+  // Find existing _config.json
+  const q = `name='_config.json' and '${beAreaFolderId}' in parents and trashed=false`;
+  const s = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify({
+    name: '_config.json', parents: [beAreaFolderId], mimeType: 'application/json'
+  })], { type: 'application/json' }));
+  form.append('file', blob);
+
+  if (s.files && s.files.length > 0) {
+    // Update existing — make it publicly readable
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${s.files[0].id}?uploadType=multipart`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: form
+    });
+    // Set public readable
+    await beApi(`https://www.googleapis.com/drive/v3/files/${s.files[0].id}/permissions`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+  } else {
+    const created = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: form
+    }).then(r => r.json());
+    if (created.id) {
+      await beApi(`https://www.googleapis.com/drive/v3/files/${created.id}/permissions`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ role: 'reader', type: 'anyone' })
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// CORRECCIÓN DE PLANIFICACIONES
+// ══════════════════════════════════════════════════════
+let explorerStack = []; // [{ id, nombre }]
+let currentCorrectionPlan = null;
+let currentCorrectionFileId = null;
+let currentCorrectionFileName = null;
+
+async function loadExplorer() {
+  if (!beGAccessToken) { conectarDriveBe(); return; }
+  if (!beAreaFolderId) { await initBeAreaFolder(); }
+
+  explorerStack = [{ id: beAreaFolderId, nombre: beUser.area }];
+  await renderExplorer();
+}
+
+function updateBreadcrumb() {
+  const bc = document.getElementById('explorerBreadcrumb');
+  bc.innerHTML = explorerStack.map((item, i) => {
+    if (i < explorerStack.length - 1) {
+      return `<span style="cursor:pointer;color:var(--accent);" onclick="goToStackLevel(${i})">📁 ${escBe(item.nombre)}</span><span style="margin:0 6px;color:var(--text-faint);">/</span>`;
+    }
+    return `<span style="font-size:13px;font-weight:600;">📁 ${escBe(item.nombre)}</span>`;
+  }).join('');
+}
+
+async function goToStackLevel(i) {
+  explorerStack = explorerStack.slice(0, i + 1);
+  await renderExplorer();
+}
+
+async function renderExplorer() {
+  updateBreadcrumb();
+  const currentFolder = explorerStack[explorerStack.length - 1];
+  const header = document.getElementById('explorerHeader');
+  const list = document.getElementById('explorerList');
+  header.textContent = `📂 ${currentFolder.nombre}`;
+  list.innerHTML = '<div class="explorer-empty">Cargando...</div>';
+
+  const q = `'${currentFolder.id}' in parents and trashed=false`;
+  const r = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size)&orderBy=name`);
+  const files = r.files || [];
+
+  if (!files.length) {
+    list.innerHTML = '<div class="explorer-empty">Carpeta vacía</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  files.forEach(file => {
+    const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
+    const isPdf = file.name.endsWith('.pdf');
+    if (!isFolder && !isPdf) return; // Skip other files
+
+    const div = document.createElement('div');
+    div.className = 'explorer-item';
+    div.innerHTML = `
+      <span class="explorer-item-icon">${isFolder ? '📁' : '📄'}</span>
+      <span class="explorer-item-name">${escBe(file.name)}</span>
+      <span class="explorer-item-meta">${isFolder ? '' : formatDate(file.modifiedTime)}</span>`;
+    div.onclick = () => {
+      if (isFolder) {
+        explorerStack.push({ id: file.id, nombre: file.name });
+        renderExplorer();
+      } else if (isPdf) {
+        abrirParaCorreccion(file);
+      }
+    };
+    list.appendChild(div);
+  });
+}
+
+async function abrirParaCorreccion(file) {
+  currentCorrectionFileId = file.id;
+  currentCorrectionFileName = file.name;
+  document.getElementById('correctionFileName').textContent = file.name;
+  document.getElementById('correctionContent').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Cargando planificación...</div>';
+  document.getElementById('correctionExplorer').style.display = 'none';
+  document.getElementById('correctionViewer').style.display = 'block';
+
+  // Download PDF and read metadata
+  try {
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+      headers: { Authorization: `Bearer ${beGAccessToken}` }
+    });
+    const arrayBuffer = await resp.arrayBuffer();
+    const planData = await extractPlanFromPdf(arrayBuffer);
+
+    if (planData) {
+      currentCorrectionPlan = planData;
+      renderCorrectionView(planData, file.name);
+    } else {
+      document.getElementById('correctionContent').innerHTML =
+        '<div style="padding:20px;color:var(--text-muted);font-size:13px;">⚠ Este PDF no tiene datos de planificación embebidos. Solo se pueden corregir planificaciones generadas por la app.</div>';
+    }
+  } catch(e) {
+    document.getElementById('correctionContent').innerHTML =
+      `<div style="padding:20px;color:var(--red);font-size:13px;">Error al cargar: ${e.message}</div>`;
+  }
+}
+
+async function extractPlanFromPdf(arrayBuffer) {
+  // Load PDF.js
+  if (!window._pdfjsLib) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        window._pdfjsLib = window.pdfjsLib;
+        res();
+      };
+      s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  const pdf = await window._pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const meta = await pdf.getMetadata();
+  const subject = (meta && meta.info && meta.info.Subject) || '';
+  if (!subject) return null;
+  try {
+    const json = JSON.parse(decodeURIComponent(escape(atob(subject))));
+    if (json._v === 2) return json;
+  } catch(e) {}
+  return null;
+}
+
+function renderCorrectionView(plan, fileName) {
+  const tc = {
+    Recibimiento:{bg:'#dbeafe',color:'#1e3a5f'},
+    Traslado:{bg:'#f1f0ed',color:'#3d3b37'},
+    Juego:{bg:'#dcfce7',color:'#14532d'},
+    Merienda:{bg:'#fef3c7',color:'#78350f'},
+    Cierre:{bg:'#fce7f3',color:'#831843'},
+    Personalizado:{bg:'#f3e8ff',color:'#6b21a8'},
+  };
+
+  let html = `<div style="background:var(--accent);padding:12px 16px;border-radius:10px;margin-bottom:16px;color:#fff;">
+    <div style="font-size:16px;font-weight:800;">${escBe(plan.grupo||'')} — ${escBe(plan.tema||'')}</div>
+    <div style="font-size:12px;opacity:.8;margin-top:2px;">${escBe(plan.fecha||'')} · ${escBe(plan.hilo||'')}</div>
+  </div>`;
+
+  (plan.momentos||[]).forEach((m, mi) => {
+    const c = tc[m.tipo] || {bg:'#f1f0ed',color:'#333'};
+    const tipoLabel = m.tipo === 'Personalizado' ? (m.customTipo || 'Personalizado') : m.tipo;
+    const comentarios = m._comentarios || [];
+
+    html += `<div class="correction-momento">
+      <div class="correction-momento-header">
+        <span style="background:${c.bg};color:${c.color};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;">${escBe(tipoLabel)}</span>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:8px;">${escBe(m.horaInicio||'')}${m.horaInicio&&m.horaCierre?' → ':''}${escBe(m.horaCierre||'')}</span>
+      </div>
+      <div class="correction-momento-body">
+        <div class="correction-field">
+          <div class="correction-field-lbl">Desarrollo</div>
+          <div class="correction-field-val">${escBe(m.desc||'—')}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">
+          <div class="correction-field"><div class="correction-field-lbl">Lugar</div><div class="correction-field-val">${escBe(m.lugar||'—')}</div></div>
+          <div class="correction-field"><div class="correction-field-lbl">Dinámica</div><div class="correction-field-val">${escBe(m.din||'—')}</div></div>
+        </div>
+        <div class="comment-wrap">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:6px;">Comentarios del coordinador</div>
+          <div id="comments-${mi}">
+            ${comentarios.map((c,ci) => `
+              <div class="comment-existing">
+                <span class="comment-text">💬 ${escBe(c)}</span>
+                <button class="comment-del" onclick="quitarComentario(${mi},${ci})">×</button>
+              </div>`).join('')}
+          </div>
+          <div class="add-comment-row">
+            <input class="add-comment-input" id="commentInput-${mi}" placeholder="Escribí un comentario..." onkeydown="if(event.key==='Enter')agregarComentario(${mi})"/>
+            <button class="add-comment-btn" onclick="agregarComentario(${mi})">+ Agregar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('correctionContent').innerHTML = html;
+}
+
+function agregarComentario(mi) {
+  const input = document.getElementById(`commentInput-${mi}`);
+  const texto = input.value.trim();
+  if (!texto) return;
+  if (!currentCorrectionPlan.momentos[mi]._comentarios) currentCorrectionPlan.momentos[mi]._comentarios = [];
+  currentCorrectionPlan.momentos[mi]._comentarios.push(texto);
+  input.value = '';
+  renderCorrectionView(currentCorrectionPlan, currentCorrectionFileName);
+}
+
+function quitarComentario(mi, ci) {
+  currentCorrectionPlan.momentos[mi]._comentarios.splice(ci, 1);
+  renderCorrectionView(currentCorrectionPlan, currentCorrectionFileName);
+}
+
+async function guardarCorreccion() {
+  if (!currentCorrectionPlan || !currentCorrectionFileId) return;
+  const btn = document.querySelector('#correctionViewer .btn.success');
+  btn.textContent = '⏳ Guardando...';
+  btn.disabled = true;
+
+  try {
+    // Load jsPDF + html2canvas
+    if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+
+    // Build printable HTML with comments highlighted
+    const pdfBlob = await generarPdfConComentarios(currentCorrectionPlan);
+    const nuevoNombre = currentCorrectionFileName.replace('.pdf','') + ' (corregida).pdf';
+
+    // Get parent folder
+    const parentFolderData = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents`);
+    const parentId = (parentFolderData.parents || [])[0];
+
+    // Upload new file
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify({
+      name: nuevoNombre, parents: parentId ? [parentId] : [], mimeType: 'application/pdf'
+    })], { type: 'application/json' }));
+    form.append('file', pdfBlob);
+    const uploaded = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: form
+    }).then(r => r.json());
+
+    if (uploaded.id) {
+      // Delete original
+      await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}`, { method: 'DELETE' });
+      showToastBe(`✓ Guardado como "${nuevoNombre}"`);
+      volverExplorer();
+    } else {
+      throw new Error('No se pudo subir el archivo');
+    }
+  } catch(e) {
+    showToastBe('Error: ' + e.message);
+  } finally {
+    btn.textContent = '💾 Guardar corrección';
+    btn.disabled = false;
+  }
+}
+
+async function generarPdfConComentarios(plan) {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const PAGE_W = 794, PAGE_W_MM = 210, PAGE_H_MM = 297;
+
+  // Build HTML
+  const tc = {
+    Recibimiento:{bg:'#dbeafe',color:'#1e3a5f'},
+    Traslado:{bg:'#f1f0ed',color:'#3d3b37'},
+    Juego:{bg:'#dcfce7',color:'#14532d'},
+    Merienda:{bg:'#fef3c7',color:'#78350f'},
+    Cierre:{bg:'#fce7f3',color:'#831843'},
+    Personalizado:{bg:'#f3e8ff',color:'#6b21a8'},
+  };
+
+  const momentosHtml = (plan.momentos||[]).map(m => {
+    const c = tc[m.tipo] || {bg:'#f1f0ed',color:'#333'};
+    const tipoLabel = m.tipo === 'Personalizado' ? (m.customTipo||'Personalizado') : m.tipo;
+    const comentariosHtml = (m._comentarios||[]).length
+      ? `<div style="margin-top:8px;border-left:4px solid #f59e0b;background:#fef3c7;padding:8px 12px;border-radius:4px;">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;margin-bottom:4px;">💬 Comentarios del coordinador</div>
+          ${(m._comentarios||[]).map(c => `<div style="font-size:10px;color:#78350f;margin-bottom:3px;">• ${c}</div>`).join('')}
+        </div>` : '';
+    return `<div style="margin-bottom:12px;">
+      <div style="background:#fff3eb;padding:8px 12px;border-left:4px solid #e8630a;display:flex;align-items:center;gap:8px;">
+        <span style="background:${c.bg};color:${c.color};padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;">${tipoLabel}</span>
+        <span style="font-size:11px;color:#7a5c44;">${m.horaInicio||''}${m.horaInicio&&m.horaCierre?' → ':''}${m.horaCierre||''}</span>
+      </div>
+      <div style="padding:8px 12px;font-size:11px;color:#1a1917;">${m.desc||'—'}</div>
+      ${comentariosHtml}
+    </div>`;
+  }).join('');
+
+  const printHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:Arial,sans-serif;width:${PAGE_W}px;padding:8px 10px;background:#fff;">
+    <div style="background:#e8630a;padding:10px 14px;border-radius:4px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#fff;font-size:18px;font-weight:800;">CISSAB</span>
+      <span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Hoja de Planificación</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid #fcd9c0;border-radius:4px;margin-bottom:8px;">
+      <div style="padding:6px 10px;border-right:1px solid #fcd9c0;"><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#e8630a;margin-bottom:2px;">Grupo</div><div style="font-size:11px;">${plan.grupo||''}</div></div>
+      <div style="padding:6px 10px;"><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#e8630a;margin-bottom:2px;">Fecha</div><div style="font-size:11px;">${plan.fecha||''}</div></div>
+      <div style="padding:6px 10px;border-right:1px solid #fcd9c0;border-top:1px solid #fcd9c0;"><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#e8630a;margin-bottom:2px;">Tema</div><div style="font-size:11px;">${plan.tema||''}</div></div>
+      <div style="padding:6px 10px;border-top:1px solid #fcd9c0;"><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#e8630a;margin-bottom:2px;">Contenido</div><div style="font-size:11px;">${plan.contenido||''}</div></div>
+    </div>
+    <div style="background:#fff3eb;border:1px solid #fcd9c0;border-radius:4px;padding:6px 10px;margin-bottom:8px;">
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#e8630a;margin-bottom:2px;">Hilo conductor</div>
+      <div style="font-size:11px;color:#7a3a10;">${plan.hilo||''}</div>
+    </div>
+    ${momentosHtml}
+  </body></html>`;
+
+  // Render via iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${PAGE_W}px;height:800px;border:none;visibility:hidden;`;
+  document.body.appendChild(iframe);
+  await new Promise(res => { iframe.onload = res; iframe.srcdoc = printHtml; setTimeout(res, 2000); });
+  await new Promise(r => setTimeout(r, 400));
+
+  const iDoc = iframe.contentDocument;
+  const elements = Array.from(iDoc.body.children);
+  let curY = 0;
+  const MM_PER_PX = PAGE_W_MM / PAGE_W;
+  const SCALE = 2;
+  const M = 8;
+
+  for (const el of elements) {
+    const c = await html2canvas(el, { scale:SCALE, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, width:PAGE_W, windowWidth:PAGE_W });
+    const hMM = (c.height / SCALE) * MM_PER_PX;
+    if (curY + hMM > PAGE_H_MM && curY > 0) { pdf.addPage(); curY = 0; }
+    pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', M, curY, PAGE_W_MM - M*2, hMM);
+    curY += hMM + 2;
+  }
+  document.body.removeChild(iframe);
+
+  // Embed plan data in metadata
+  plan._corregida = true;
+  pdf.setProperties({ subject: btoa(unescape(encodeURIComponent(JSON.stringify(plan)))), keywords:'cissab-planificacion-v2' });
+  return pdf.output('blob');
+}
+
+function volverExplorer() {
+  document.getElementById('correctionExplorer').style.display = 'block';
+  document.getElementById('correctionViewer').style.display = 'none';
+  currentCorrectionPlan = null;
+  currentCorrectionFileId = null;
+}
+
+// ══════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════
+function escBe(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showToastBe(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function markUnsaved() {
+  unsaved = true;
+  document.getElementById('saveBarInfo').innerHTML = '<span class="unsaved-dot"></span>Tenés cambios sin guardar';
+}
+function markSaved() {
+  unsaved = false;
+  document.getElementById('saveBarInfo').textContent = '✓ Todo guardado';
+}
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
+}
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src;
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+window.addEventListener('beforeunload', e => { if (unsaved) e.returnValue = ''; });
+
+// ── Init ──
+if (tryBeAutoLogin()) afterBeLogin();
+else document.getElementById('loginScreen').style.display = 'flex';
+</script>
+</body>
+</html>
