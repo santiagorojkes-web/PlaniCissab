@@ -1087,9 +1087,9 @@ function getNombreArchivo(){
     return[grupo,(jt.trim()||'Jag'),fechaStr,_s].filter(Boolean).join(' ');
   }
   const _tc = window._turnoConfig;
-  const shiftSuffix = currentShift === 'tarde'
-    ? (_tc && _tc.t1 ? _tc.t1 : 'Tarde')
-    : (_tc && _tc.t2 ? _tc.t2 : 'Nocturna');
+  const shiftSuffix = currentShift === 'tarde' ? (_tc&&_tc.t1||'Tarde')
+    : currentShift === 'nocturna' ? (_tc&&_tc.t2||'Nocturna')
+    : (_tc&&_tc.t3||'Tercer');
   return[grupo,tipoShort,fechaStr,shiftSuffix].filter(Boolean).join(' ');
 }
 
@@ -1286,15 +1286,19 @@ async function deleteSyncFiles(uploadedFolderNames) {
       for (const f of (s1.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
     } catch(e) {}
   }
-  // Delete ALL "(con comentarios)" versions of this file anywhere in Drive
+  // Delete ALL "(con comentarios)" versions AND original name versions from Drive
   const baseName = pendingName || '';
   if (baseName) {
-    try {
-      const comentName = baseName + ' (con comentarios).pdf';
-      const q = `name='${comentName}' and trashed=false`;
-      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
-      for (const f of (s.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
-    } catch(e) {}
+    // Delete "(con comentarios)" copies
+    for (const suffix of [' (con comentarios)', '']) {
+      try {
+        const searchName = baseName + suffix + (suffix ? '.pdf' : '');
+        if (!suffix) continue; // skip the base name — the new upload just replaced it
+        const q = `name='${searchName.replace(/'/g,"\'")}' and trashed=false`;
+        const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+        for (const f of (s.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
+      } catch(e) {}
+    }
   }
 }
 
@@ -2338,7 +2342,7 @@ function nuevaPlanificacion() {
      'cissab_v2_objetivo','cissab_v2_hilo'].forEach(k => localStorage.removeItem(k));
   } catch(e){}
   // Reset both plans
-  planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState() };
+  planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState(), tercer: emptyPlanState() };
   currentShift = 'tarde';
   madrijim=[]; momentos=[]; nextId=1;
   selectedGrupos = (currentUser && currentUser.grupo && !currentUser.isAdmin) ? [currentUser.grupo] : [];
@@ -2814,7 +2818,7 @@ const emptyPlanState = () => ({
   selectedGrupos: [], selectedTipoAct: '', jagText: '',
   fecha:'', tema:'', contenido:'', objetivo:'', hilo:''
 });
-let planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState() };
+let planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState(), tercer: emptyPlanState() };
 
 function captureCurrentPlan() {
   const fechaVal = (document.getElementById('fecha')||{}).value||'';
@@ -2864,19 +2868,40 @@ function switchShift(shift) {
   captureCurrentPlan();
   saveShiftsToStorage();
   currentShift = shift;
+  // Initialize tercer plan state if not exists
+  if (!planStates[shift]) planStates[shift] = emptyPlanState();
   applyPlanState(planStates[currentShift]);
   updateShiftUI();
+  // Auto-set date for shifts named "Domingo" (+1 from t1)
+  const tc = window._turnoConfig || {};
+  const shiftName = shift==='tarde' ? tc.t1 : shift==='nocturna' ? tc.t2 : tc.t3;
+  if (shiftName === 'Domingo') {
+    const t1fecha = planStates['tarde'] && planStates['tarde'].fecha;
+    if (t1fecha) {
+      const d = new Date(t1fecha + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      const fechaEl = document.getElementById('fecha');
+      if (fechaEl && !fechaEl.value) fechaEl.value = `${yyyy}-${mm}-${dd}`;
+    }
+  }
   saveAll();
 }
 
 function updateShiftUI() {
   const btnT = document.getElementById('btnTarde');
   const btnN = document.getElementById('btnNocturna');
+  const btnTer = document.getElementById('btnTercer');
   const lbl  = document.getElementById('shiftLabel');
   if(!btnT) return;
+  const tc = window._turnoConfig || {};
   btnT.className = 'shift-btn' + (currentShift==='tarde' ? ' active-tarde' : '');
   btnN.className = 'shift-btn' + (currentShift==='nocturna' ? ' active-nocturna' : '');
-  if(lbl) lbl.textContent = currentShift==='tarde' ? 'Planificando la tarde' : 'Planificando la nocturna';
+  if (btnTer) btnTer.className = 'shift-btn' + (currentShift==='tercer' ? ' active-tarde' : '');
+  const shiftName = currentShift==='tarde' ? (tc.t1||'Tarde') : currentShift==='nocturna' ? (tc.t2||'Nocturna') : (tc.t3||'Tercer turno');
+  if(lbl) lbl.textContent = 'Planificando: ' + shiftName;
 }
 
 function saveShiftsToStorage() {
@@ -2959,11 +2984,28 @@ function updateShiftLabels(turnos) {
   window._turnoConfig = turnos;
   const btn1 = document.getElementById('btnTarde');
   const btn2 = document.getElementById('btnNocturna');
-  const t1Icon = '☀ ', t2Icon = '🌙 ';
+  const btn3 = document.getElementById('btnTercer');
+  const t1Icon = '☀ ', t2Icon = '🌙 ', t3Icon = '🌅 ';
   if (btn1) btn1.textContent = t1Icon + (turnos.t1 || 'Tarde');
   if (btn2) {
     btn2.textContent = t2Icon + (turnos.t2 || 'Nocturna');
     btn2.style.display = turnos.t2activo === false ? 'none' : '';
+  }
+  // Third shift button — create dynamically if needed
+  const toggle = document.querySelector('.shift-toggle');
+  if (toggle && turnos.t3activo && turnos.t3) {
+    let b3 = document.getElementById('btnTercer');
+    if (!b3) {
+      b3 = document.createElement('button');
+      b3.id = 'btnTercer';
+      b3.className = 'shift-btn';
+      b3.onclick = () => switchShift('tercer');
+      toggle.appendChild(b3);
+    }
+    b3.textContent = t3Icon + turnos.t3;
+    b3.style.display = '';
+  } else if (btn3) {
+    btn3.style.display = 'none';
   }
   updateShiftUI();
 }
