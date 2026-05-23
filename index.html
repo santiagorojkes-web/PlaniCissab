@@ -1287,19 +1287,18 @@ async function deleteSyncFiles(uploadedFolderNames) {
       for (const f of (s1.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
     } catch(e) {}
   }
-  // Delete ALL "(con comentarios)" versions AND original name versions from Drive
+  // Delete ALL "(con comentarios)" versions of this planificacion from ALL Drive folders
   const baseName = pendingName || '';
   if (baseName) {
-    // Delete "(con comentarios)" copies
-    for (const suffix of [' (con comentarios)', '']) {
-      try {
-        const searchName = baseName + suffix + (suffix ? '.pdf' : '');
-        if (!suffix) continue; // skip the base name — the new upload just replaced it
-        const q = `name='${searchName.replace(/'/g,"\'")}' and trashed=false`;
-        const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
-        for (const f of (s.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
-      } catch(e) {}
-    }
+    try {
+      const comentName = baseName + ' (con comentarios).pdf';
+      const q = `name='${comentName.replace(/'/g,"\'")}' and trashed=false`;
+      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`);
+      for (const f of (s.files||[])) {
+        await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
+      }
+      if ((s.files||[]).length > 0) showToast('✓ Versión con comentarios eliminada de Drive');
+    } catch(e) {}
   }
 }
 
@@ -3117,10 +3116,25 @@ async function cargarPlanisConComentarios() {
   try {
     await initAreaFolder();
     if (!carpetaAreaId) throw new Error('No se encontró la carpeta del área');
-    // Search for files with "(con comentarios)" in ALL subfolders
-    const q = `name contains '(con comentarios)' and mimeType='application/pdf' and trashed=false`;
-    const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents,modifiedTime)&pageSize=50`);
-    const files = (r.files||[]);
+    // Build group filter for filename
+    const grupoFilter = selectedGrupos.length > 0 ? selectedGrupos : (currentUser&&currentUser.grupo?[currentUser.grupo]:[]);
+    // Search for files with "(con comentarios)" - filter by current group(s)
+    let allFiles = [];
+    for (const grupo of (grupoFilter.length ? grupoFilter : [''])) {
+      const nameFilter = grupo ? `name contains '${grupo}' and ` : '';
+      const q = `${nameFilter}name contains '(con comentarios)' and mimeType='application/pdf' and trashed=false`;
+      const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=50`);
+      allFiles.push(...(r.files||[]));
+    }
+    // Deduplicate by filename (show each planificacion once regardless of how many folders)
+    const seen = new Map();
+    for (const f of allFiles) {
+      const baseName = f.name;
+      if (!seen.has(baseName) || new Date(f.modifiedTime) > new Date(seen.get(baseName).modifiedTime)) {
+        seen.set(baseName, f);
+      }
+    }
+    const files = [...seen.values()];
     if (!files.length) {
       content.innerHTML = '<div class="no-corregir">✓ No tenés planificaciones por corregir</div>';
     } else {
@@ -3153,7 +3167,7 @@ async function importarPlaniConComentarios(fileId, fileName) {
     });
     const arrayBuffer = await resp.arrayBuffer();
     // Reuse existing PDF import logic
-    await handlePdfArrayBuffer(arrayBuffer);
+    await handlePdfArrayBuffer(arrayBuffer, fileName);
     cerrarCorregirModal();
     showToast('✓ Planificación con comentarios cargada');
   } catch(e) {
@@ -3162,9 +3176,9 @@ async function importarPlaniConComentarios(fileId, fileName) {
 }
 
 // Wrapper so we can call from corregir flow
-async function handlePdfArrayBuffer(arrayBuffer) {
+async function handlePdfArrayBuffer(arrayBuffer, fileName) {
   const blob = new Blob([arrayBuffer], {type:'application/pdf'});
-  const file = new File([blob], 'planificacion.pdf', {type:'application/pdf'});
+  const file = new File([blob], fileName || 'planificacion.pdf', {type:'application/pdf'});
   await handlePdfFile(file);
 }
 
