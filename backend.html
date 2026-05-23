@@ -301,7 +301,21 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
           <div class="field-label">Nombre</div>
           <input class="field-input" id="turno2Nombre" placeholder="ej: Nocturna o Domingo" oninput="markUnsaved()"/>
           <div style="margin-top:8px;font-size:12px;color:var(--text-muted);">
-            💡 Si el nombre es <b>Domingo</b>, la fecha del turno 2 se calcula automáticamente como el día siguiente al turno 1.
+            💡 Si el nombre es <b>Domingo</b>, la fecha se calcula como el día siguiente al turno 1.
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Turno 3</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <input type="checkbox" id="turno3Activo" onchange="toggleTurno3()"/> 
+          <label for="turno3Activo" style="font-size:13px;cursor:pointer;">Habilitar tercer turno</label>
+        </div>
+        <div id="turno3Config" style="display:none;">
+          <div class="field-label">Nombre</div>
+          <input class="field-input" id="turno3Nombre" placeholder="ej: Domingo" oninput="markUnsaved()"/>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted);">
+            💡 Si el nombre es <b>Domingo</b>, la fecha se calcula como el día siguiente al turno 1.
           </div>
         </div>
       </div>
@@ -739,11 +753,19 @@ function renderTurnos() {
   document.getElementById('turno2Activo').checked = !!config.turnos.t2activo;
   document.getElementById('turno2Nombre').value = config.turnos.t2 || '';
   document.getElementById('turno2Config').style.display = config.turnos.t2activo ? 'block' : 'none';
+  document.getElementById('turno3Activo').checked = !!config.turnos.t3activo;
+  document.getElementById('turno3Nombre').value = config.turnos.t3 || '';
+  document.getElementById('turno3Config').style.display = config.turnos.t3activo ? 'block' : 'none';
 }
 
 function toggleTurno2() {
   config.turnos.t2activo = document.getElementById('turno2Activo').checked;
   document.getElementById('turno2Config').style.display = config.turnos.t2activo ? 'block' : 'none';
+  markUnsaved();
+}
+function toggleTurno3() {
+  config.turnos.t3activo = document.getElementById('turno3Activo').checked;
+  document.getElementById('turno3Config').style.display = config.turnos.t3activo ? 'block' : 'none';
   markUnsaved();
 }
 
@@ -901,6 +923,8 @@ async function guardarConfig() {
   config.turnos.t1 = document.getElementById('turno1Nombre').value.trim() || 'Tarde';
   config.turnos.t2 = document.getElementById('turno2Nombre').value.trim();
   config.turnos.t2activo = document.getElementById('turno2Activo').checked;
+  config.turnos.t3 = document.getElementById('turno3Nombre').value.trim();
+  config.turnos.t3activo = document.getElementById('turno3Activo').checked;
 
   // También crear carpetas en Drive para grupos y actividades nuevas
   if (beGAccessToken && beAreaFolderId) {
@@ -1238,19 +1262,30 @@ async function guardarCorreccion() {
     }).then(r => r.json());
 
     if (uploaded.id) {
-      // Get all parent folders of original file
-      const fileInfo = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents,name`);
-      const parents = fileInfo.parents || [];
-      // Delete original from all parent folders
-      await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}`, { method: 'DELETE' });
-      // Upload copy to each additional parent folder too
-      for (let pi = 1; pi < parents.length; pi++) {
-        const f2 = new FormData();
-        f2.append('metadata', new Blob([JSON.stringify({name:nuevoNombre,parents:[parents[pi]],mimeType:'application/pdf'})],{type:'application/json'}));
-        f2.append('file',pdfBlob);
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${beGAccessToken}`},body:f2});
+      // Find ALL copies of the original filename anywhere in Drive and delete them
+      const origName = currentCorrectionFileName;
+      const qDel = `name='${origName.replace(/'/g,"\'")}' and trashed=false`;
+      const sDel = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qDel)}&fields=files(id,name,parents)&pageSize=50`);
+      const origParentIds = [];
+      for (const f of (sDel.files||[])) {
+        origParentIds.push(...(f.parents||[]));
+        await beApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
       }
-      showToastBe(`✓ Guardado como "${nuevoNombre}" en ${parents.length} carpeta(s)`);
+      // Upload (con comentarios) to ALL folders the original was in
+      const uploadParents = origParentIds.length > 0 ? origParentIds : (await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents`)).parents || [];
+      let uploadCount = 0;
+      const usedParents = new Set();
+      for (const parentId of uploadParents) {
+        if (usedParents.has(parentId)) continue;
+        usedParents.add(parentId);
+        const f2 = new FormData();
+        f2.append('metadata', new Blob([JSON.stringify({name:nuevoNombre,parents:[parentId],mimeType:'application/pdf'})],{type:'application/json'}));
+        f2.append('file', pdfBlob);
+        const r2 = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${beGAccessToken}`},body:f2});
+        const d2 = await r2.json();
+        if (d2.id) uploadCount++;
+      }
+      showToastBe(`✓ Guardado "${nuevoNombre}" en ${uploadCount} carpeta(s). Original eliminado de todas las ubicaciones.`);
       volverExplorer();
     } else {
       throw new Error('No se pudo subir el archivo');
