@@ -3155,6 +3155,45 @@ renderTipoActChips();
 updateShiftUI();
 
 
+
+function connectDriveForConfig() {
+  const btn = document.getElementById('dcpConnectBtn');
+  if (btn) { btn.textContent = '⏳ Conectando...'; btn.disabled = true; }
+  window._pendingConfigLoad = true;
+  iniciarGoogleAuth();
+}
+
+function skipDriveConfig() {
+  closeDriveConfigPrompt();
+}
+
+function trySilentConfigRefresh() {
+  const area = window._currentArea || 'Moadon';
+  const tsKey = 'cissab_area_config_ts_' + area;
+  const lastLoad = localStorage.getItem(tsKey);
+  if (lastLoad) {
+    const age = Date.now() - new Date(lastLoad).getTime();
+    if (age < 3 * 60 * 60 * 1000) return;
+  }
+  if (!window.google || !GDRIVE_CLIENT_ID) return;
+  try {
+    if (!gTokenClient) {
+      gTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GDRIVE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive',
+        callback: async (resp) => {
+          if (resp.error) return;
+          gAccessToken = resp.access_token;
+          ensureActivityFolders().catch(()=>{});
+          await loadConfigFromDrive();
+          localStorage.setItem('cissab_area_config_ts_' + (window._currentArea||'Moadon'), new Date().toISOString());
+        }
+      });
+    }
+    gTokenClient.requestAccessToken({ prompt: '' });
+  } catch(e) {}
+}
+
 </script>
 </body>
 </html>
