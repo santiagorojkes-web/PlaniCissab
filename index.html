@@ -1289,16 +1289,19 @@ async function deleteSyncFiles(uploadedFolderNames) {
   }
   // Delete ALL "(con comentarios)" versions of this planificacion from ALL Drive folders
   const baseName = pendingName || '';
-  if (baseName) {
+  if (baseName && gAccessToken) {
     try {
+      // Search by exact name match
       const comentName = baseName + ' (con comentarios).pdf';
       const q = `name='${comentName.replace(/'/g,"\'")}' and trashed=false`;
-      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`);
+      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50`);
+      let deleted = 0;
       for (const f of (s.files||[])) {
         await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
+        deleted++;
       }
-      if ((s.files||[]).length > 0) showToast('✓ Versión con comentarios eliminada de Drive');
-    } catch(e) {}
+      if (deleted > 0) showToast(`✓ Eliminados ${deleted} archivo(s) con comentarios de Drive`);
+    } catch(e) { console.error('Error deleting comentarios:', e); }
   }
 }
 
@@ -3116,13 +3119,16 @@ async function cargarPlanisConComentarios() {
   try {
     await initAreaFolder();
     if (!carpetaAreaId) throw new Error('No se encontró la carpeta del área');
-    // Build group filter for filename
+    // Only search WITHIN the area folder hierarchy
+    await initAreaFolder();
+    if (!carpetaAreaId) throw new Error('No se encontró carpeta del área');
     const grupoFilter = selectedGrupos.length > 0 ? selectedGrupos : (currentUser&&currentUser.grupo?[currentUser.grupo]:[]);
-    // Search for files with "(con comentarios)" - filter by current group(s)
+    // Build group name filter + restrict to area folder descendants
     let allFiles = [];
     for (const grupo of (grupoFilter.length ? grupoFilter : [''])) {
       const nameFilter = grupo ? `name contains '${grupo}' and ` : '';
-      const q = `${nameFilter}name contains '(con comentarios)' and mimeType='application/pdf' and trashed=false`;
+      // '${carpetaAreaId}' in ancestors restricts to files within the area folder tree
+      const q = `${nameFilter}name contains '(con comentarios)' and mimeType='application/pdf' and trashed=false and '${carpetaAreaId}' in ancestors`;
       const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=50`);
       allFiles.push(...(r.files||[]));
     }
