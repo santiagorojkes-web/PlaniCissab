@@ -1186,11 +1186,10 @@ function renderCorrectionView(plan, fileName) {
       <span style="font-weight:700;font-size:13px;">📋 Datos generales</span>
     </div>
     <div class="correction-momento-body">
-      ${['tema','objetivo','contenido','hilo'].map(field => `
-        <div class="correction-field">
-          <div class="correction-field-lbl">${{tema:'Tema',objetivo:'Objetivo',contenido:'Contenido',hilo:'Hilo conductor'}[field]}</div>
-          <div class="correction-field-val">${escBe(plan[field]||'—')}</div>
-        </div>`).join('')}
+      <div class="correction-field"><div class="correction-field-lbl">Tema</div><div class="correction-field-val">${escBe(plan.tema||'—')}</div></div>
+      <div class="correction-field"><div class="correction-field-lbl">Objetivo</div><div class="correction-field-val">${escBe(plan.objetivo||'—')}</div></div>
+      <div class="correction-field"><div class="correction-field-lbl">Contenido</div><div class="correction-field-val">${escBe(plan.contenido||'—')}</div></div>
+      <div class="correction-field"><div class="correction-field-lbl">Hilo conductor</div><div class="correction-field-val">${escBe(plan.hilo||'—')}</div></div>
       <div class="comment-wrap">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:6px;">Comentarios generales</div>
         <div id="comments-general">
@@ -1264,8 +1263,11 @@ function quitarComentario(mi, ci) {
   renderCorrectionView(currentCorrectionPlan, currentCorrectionFileName);
 }
 
+let _savingCorreccion = false;
 async function guardarCorreccion() {
   if (!currentCorrectionPlan || !currentCorrectionFileId) return;
+  if (_savingCorreccion) { showToastBe('Ya hay una corrección en proceso...'); return; }
+  _savingCorreccion = true;
   const btn = document.getElementById('saveCommentBtn');
   btn.textContent = '⏳ Guardando...'; btn.disabled=true;
   btn.disabled = true;
@@ -1330,7 +1332,7 @@ async function guardarCorreccion() {
     showToastBe('Error: ' + e.message);
   } finally {
     btn.textContent = '💬 Guardar comentarios'; btn.disabled=false;
-    btn.disabled = false;
+    _savingCorreccion = false;
   }
 }
 
