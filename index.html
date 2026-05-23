@@ -882,7 +882,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 </div>
 
 <div class="bottom-bar">
-  <button class="btn" onclick="showModal()" title="Volver al inicio" style="border-color:var(--border-strong);color:var(--text-muted);">&#8592; Inicio</button>
+  <button class="btn" onclick="showModal(true)" title="Volver al inicio" style="border-color:var(--border-strong);color:var(--text-muted);">&#8592; Inicio</button>
   <button class="btn" onclick="logout()" title="Cerrar sesión" style="border-color:#fca5a5;color:#dc2626;">⏏ Salir</button>
   <button class="btn" onclick="abrirImportModal()" title="Importar una planificación desde PDF">&#128196; Importar PDF</button>
   <button class="btn" onclick="abrirCorregirModal()" title="Importar planificación con comentarios del coordinador" style="border-color:#fcd9c0;color:#e8630a;">✏ Corregir plani</button>
@@ -961,6 +961,7 @@ function logout() {
   gAccessToken = null;
   gTokenClient = null;
   carpetaAreaId = null;
+  _showModalAllowed = true;
   document.getElementById('mainPage').style.display='none';
   document.getElementById('startModal').style.display='none';
   document.getElementById('loginOverlay').style.display='flex';
@@ -2305,7 +2306,12 @@ function hasSavedData() {
   } catch(e) { return false; }
 }
 
-function showModal() {
+let _showModalAllowed = true; // guard against spurious calls
+
+function showModal(force) {
+  // After user makes a choice, only show modal again if explicitly forced (← Inicio btn)
+  if (!force && !_showModalAllowed) return;
+  _showModalAllowed = false; // block subsequent auto-calls until logout
   const hasSaved = hasSavedData();
   const badge = document.getElementById('savedBadge');
   const btnC  = document.getElementById('btnContinuar');
