@@ -1176,9 +1176,36 @@ function renderCorrectionView(plan, fileName) {
     Personalizado:{bg:'#f3e8ff',color:'#6b21a8'},
   };
 
+  const genComments = plan._comentariosGenerales || [];
   let html = `<div style="background:var(--accent);padding:12px 16px;border-radius:10px;margin-bottom:16px;color:#fff;">
     <div style="font-size:16px;font-weight:800;">${escBe(plan.grupo||'')} — ${escBe(plan.tema||'')}</div>
     <div style="font-size:12px;opacity:.8;margin-top:2px;">${escBe(plan.fecha||'')} · ${escBe(plan.hilo||'')}</div>
+  </div>
+  <div class="correction-momento" style="margin-bottom:16px;">
+    <div class="correction-momento-header">
+      <span style="font-weight:700;font-size:13px;">📋 Datos generales</span>
+    </div>
+    <div class="correction-momento-body">
+      ${['tema','objetivo','contenido','hilo'].map(field => `
+        <div class="correction-field">
+          <div class="correction-field-lbl">${{tema:'Tema',objetivo:'Objetivo',contenido:'Contenido',hilo:'Hilo conductor'}[field]}</div>
+          <div class="correction-field-val">${escBe(plan[field]||'—')}</div>
+        </div>`).join('')}
+      <div class="comment-wrap">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:6px;">Comentarios generales</div>
+        <div id="comments-general">
+          ${genComments.map((c,ci)=>`
+            <div class="comment-existing">
+              <span class="comment-text">💬 ${escBe(c)}</span>
+              <button class="comment-del" onclick="quitarComentarioGeneral(${ci})">×</button>
+            </div>`).join('')}
+        </div>
+        <div class="add-comment-row">
+          <input class="add-comment-input" id="commentInput-general" placeholder="Comentario sobre tema/objetivo/contenido/hilo..." onkeydown="if(event.key==='Enter')agregarComentarioGeneral()"/>
+          <button class="add-comment-btn" onclick="agregarComentarioGeneral()">+ Agregar</button>
+        </div>
+      </div>
+    </div>
   </div>`;
 
   (plan.momentos||[]).forEach((m, mi) => {
@@ -1267,22 +1294,26 @@ async function guardarCorreccion() {
     }).then(r => r.json());
 
     if (uploaded.id) {
-      // Find ALL copies of the original filename anywhere in Drive and delete them
+      // Get parents of the file being corrected
+      const origFileInfo = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents,name`);
+      const directParents = origFileInfo.parents || [];
+      // Search for other copies of the same filename anywhere in Drive
       const origName = currentCorrectionFileName;
       const qDel = `name='${origName.replace(/'/g,"\'")}' and trashed=false`;
-      const sDel = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qDel)}&fields=files(id,name,parents)&pageSize=50`);
-      const origParentIds = [];
+      const sDel = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qDel)}&fields=files(id,parents)&pageSize=50`);
+      // Collect all unique parent folders
+      const allParents = new Set(directParents);
       for (const f of (sDel.files||[])) {
-        origParentIds.push(...(f.parents||[]));
-        await beApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
+        (f.parents||[]).forEach(p => allParents.add(p));
+        if (f.id !== currentCorrectionFileId) {
+          await beApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
+        }
       }
-      // Upload (con comentarios) to ALL folders the original was in
-      const uploadParents = origParentIds.length > 0 ? origParentIds : (await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents`)).parents || [];
+      // Delete the original file
+      await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}`, { method: 'DELETE' });
+      // Upload (con comentarios) to each unique parent folder
       let uploadCount = 0;
-      const usedParents = new Set();
-      for (const parentId of uploadParents) {
-        if (usedParents.has(parentId)) continue;
-        usedParents.add(parentId);
+      for (const parentId of allParents) {
         const f2 = new FormData();
         f2.append('metadata', new Blob([JSON.stringify({name:nuevoNombre,parents:[parentId],mimeType:'application/pdf'})],{type:'application/json'}));
         f2.append('file', pdfBlob);
@@ -1290,7 +1321,7 @@ async function guardarCorreccion() {
         const d2 = await r2.json();
         if (d2.id) uploadCount++;
       }
-      showToastBe(`✓ Guardado "${nuevoNombre}" en ${uploadCount} carpeta(s). Original eliminado de todas las ubicaciones.`);
+      showToastBe(`✓ Guardado "${nuevoNombre}" en ${uploadCount} carpeta(s). Original eliminado.`);
       volverExplorer();
     } else {
       throw new Error('No se pudo subir el archivo');
