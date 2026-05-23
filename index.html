@@ -1143,7 +1143,7 @@ async function loadDriveFolders(){
   // List groups and activity folders inside the area subfolder
   const q=`mimeType='application/vnd.google-apps.folder' and '${carpetaAreaId}' in parents and trashed=false`;
   const r=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`);
-  const ex={};(r.files||[]).forEach(f=>ex[f.name.toLowerCase()]=f.id);
+  const ex={};(r.files||[]).forEach(f=>ex[f.name.trim().toLowerCase()]=f.id);
   Object.assign(ex, KNOWN_FOLDER_IDS);
   driveRootFolders=ex;
 }
