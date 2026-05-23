@@ -591,15 +591,20 @@ function agregarGrupo() {
   const n = nombre.trim();
   if (config.grupos[n]) { showToastBe('Ese grupo ya existe'); return; }
   config.grupos[n] = [];
+  if (!config.usuarios) config.usuarios = {};
+  config.usuarios[n] = { email: '', pw: '' };
   markUnsaved();
   renderGrupos();
+  renderUsuarios();
 }
 
 function eliminarGrupo(nombre) {
   if (!confirm(`¿Eliminás el grupo "${nombre}" y todos sus madrijim?`)) return;
   delete config.grupos[nombre];
+  if (config.usuarios) delete config.usuarios[nombre];
   markUnsaved();
   renderGrupos();
+  renderUsuarios();
 }
 
 function agregarMadrij(grupo, input) {
