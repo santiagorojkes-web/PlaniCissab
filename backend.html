@@ -1182,7 +1182,7 @@ function renderCorrectionView(plan, fileName) {
           </div>
           <div class="add-comment-row">
             <input class="add-comment-input" id="commentInput-${mi}" placeholder="Escribí un comentario..." onkeydown="if(event.key==='Enter')agregarComentario(${mi})"/>
-            <button class="comment-mic" id="micBtn-${mi}" onclick="toggleMicComment(this,'commentInput-${mi}')" title="Dictar comentario">🎙</button>
+            <button class="comment-mic" id="micBtn-${mi}" onclick="toggleMicComment(this,'commentInput-${mi}')" title="Dictar comentario" style="background:none;border:none;cursor:pointer;padding:0 4px;color:var(--text-muted);flex-shrink:0;"><svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="0.5" width="6" height="9" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 7.5C1.5 10.537 4 13 7 13C10 13 12.5 10.537 12.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="13" x2="7" y2="15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <button class="add-comment-btn" onclick="agregarComentario(${mi})">+ Agregar</button>
           </div>
         </div>
@@ -1238,9 +1238,19 @@ async function guardarCorreccion() {
     }).then(r => r.json());
 
     if (uploaded.id) {
-      // Delete original
+      // Get all parent folders of original file
+      const fileInfo = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents,name`);
+      const parents = fileInfo.parents || [];
+      // Delete original from all parent folders
       await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}`, { method: 'DELETE' });
-      showToastBe(`✓ Guardado como "${nuevoNombre}"`);
+      // Upload copy to each additional parent folder too
+      for (let pi = 1; pi < parents.length; pi++) {
+        const f2 = new FormData();
+        f2.append('metadata', new Blob([JSON.stringify({name:nuevoNombre,parents:[parents[pi]],mimeType:'application/pdf'})],{type:'application/json'}));
+        f2.append('file',pdfBlob);
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${beGAccessToken}`},body:f2});
+      }
+      showToastBe(`✓ Guardado como "${nuevoNombre}" en ${parents.length} carpeta(s)`);
       volverExplorer();
     } else {
       throw new Error('No se pudo subir el archivo');
@@ -1330,10 +1340,24 @@ async function generarPdfConComentarios(plan) {
 
   // Embed plan data in metadata
   plan._corregida = true;
+  plan._archivoCon = currentCorrectionFileName.replace('.pdf','') + ' (con comentarios)';
   pdf.setProperties({ subject: btoa(unescape(encodeURIComponent(JSON.stringify(plan)))), keywords:'cissab-planificacion-v2' });
   return pdf.output('blob');
 }
 
+
+function agregarComentarioGeneral() {
+  const input = document.getElementById('commentInput-general');
+  if (!input || !input.value.trim()) return;
+  if (!currentCorrectionPlan._comentariosGenerales) currentCorrectionPlan._comentariosGenerales = [];
+  currentCorrectionPlan._comentariosGenerales.push(input.value.trim());
+  input.value = '';
+  renderCorrectionView(currentCorrectionPlan, currentCorrectionFileName);
+}
+function quitarComentarioGeneral(ci) {
+  currentCorrectionPlan._comentariosGenerales.splice(ci, 1);
+  renderCorrectionView(currentCorrectionPlan, currentCorrectionFileName);
+}
 function volverExplorer() {
   document.getElementById('correctionExplorer').style.display = 'block';
   document.getElementById('correctionViewer').style.display = 'none';
