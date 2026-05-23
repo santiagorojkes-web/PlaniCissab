@@ -1646,11 +1646,11 @@ function iniciarGoogleAuth() {
           const _lb = document.getElementById('dcpConnectBtn'); if(_lb){ _lb.textContent='✓ Conectado'; _lb.disabled=false; }
           // Load config then go to main modal
           await loadConfigFromDrive();
-          // Mark as ever connected — popup won't show again on this device
+          // Config loaded — just close popup, modal already open underneath
           const area = window._currentArea || 'Moadon';
-          localStorage.setItem('cissab_drive_ever_connected_' + area, '1');
           localStorage.setItem('cissab_area_config_ts_' + area, new Date().toISOString());
-          showModal();
+          closeDriveConfigPrompt();
+          showToast('✓ Configuración de ' + (area||'área') + ' cargada');
           return;
         }
         if (window._pendingCorregir) {
