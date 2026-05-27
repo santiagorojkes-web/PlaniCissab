@@ -152,11 +152,73 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .save-bar-info { font-size:12px; color:var(--text-muted); }
 .unsaved-dot { display:inline-block; width:7px; height:7px; background:var(--accent); border-radius:50%; margin-right:6px; }
 
-@media(max-width:768px){
-  :root { --sidebar-w:0px; }
-  .sidebar { display:none; }
-  .main { margin-left:0; padding:16px; }
+
+/* ── MOBILE BACKEND: hamburger drawer ── */
+
+/* Overlay behind open drawer */
+#drawerOverlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.5); z-index: 299;
 }
+#drawerOverlay.open { display: block; }
+
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+
+  /* Sidebar: hidden off-screen, slides in */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    z-index: 300; width: 260px;
+    box-shadow: 4px 0 24px rgba(0,0,0,.35);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Main content: full width */
+  .main {
+    margin-left: 0;
+    padding: 0 0 80px;
+  }
+
+  /* Save bar */
+  .save-bar { left: 0; padding: 10px 14px; }
+
+  /* Turno config grid */
+  .turno-config { grid-template-columns: 1fr; }
+  .field-row { flex-wrap: wrap; }
+  .correction-momento-header { flex-wrap: wrap; gap: 6px; }
+  .explorer-item { padding: 12px 14px; min-height: 48px; }
+  .explorer-item-name { font-size: 13px; }
+
+  /* Mobile top bar */
+  .mobile-top-bar {
+    display: flex !important; align-items: center; justify-content: space-between;
+    background: var(--text); padding: 0 16px;
+    height: 56px; position: sticky; top: 0; z-index: 150;
+    box-shadow: 0 2px 12px rgba(0,0,0,.25);
+  }
+  .mobile-top-bar-title { font-size: 15px; font-weight: 700; color: #fff; }
+  .mobile-save-btn {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 8px; padding: 8px 16px; font-size: 13px;
+    font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    min-height: 36px;
+  }
+  .hamburger-btn {
+    background: none; border: none; cursor: pointer; padding: 8px;
+    display: flex; flex-direction: column; gap: 5px; justify-content: center;
+  }
+  .hamburger-btn span {
+    display: block; width: 22px; height: 2px;
+    background: #fff; border-radius: 2px;
+    transition: all .2s;
+  }
+}
+@media (min-width: 769px) {
+  .mobile-top-bar { display: none !important; }
+  #drawerOverlay { display: none !important; }
+}
+
 
 .comment-mic { background:none; border:none; cursor:pointer; font-size:14px; padding:0 4px; color:var(--text-muted); vertical-align:middle; }
 .comment-mic:hover { color:var(--accent); }
@@ -175,6 +237,60 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .drive-prompt-title { font-size:17px;font-weight:800;text-align:center;margin-bottom:6px; }
 .drive-prompt-sub { font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:20px;line-height:1.5; }
 .drive-prompt-actions { display:flex;flex-direction:column;gap:8px; }
+
+
+/* ── MOBILE BACKEND EXTRA ── */
+@media (max-width: 768px) {
+  /* Usuarios grid */
+  .card [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Correction view full-screen on mobile */
+  #correctionContent { padding: 0; }
+  .correction-momento-body { padding: 12px; }
+  .correction-momento-header { padding: 10px 12px; }
+  
+  /* Comment inputs */
+  .add-comment-input { font-size: 16px !important; }
+  .add-comment-btn { min-height: 40px; }
+  
+  /* Explorer items */
+  .explorer-item { min-height: 48px; }
+  
+  /* Login box */
+  .login-box { padding: 28px 20px; }
+  .login-input { font-size: 16px !important; min-height: 48px; }
+  .login-btn { min-height: 52px; font-size: 16px; }
+  
+  /* Page padding */
+  .page { padding-bottom: 20px; }
+  .page-title { font-size: 20px; }
+  
+  /* Groups */
+  .grupo-header { min-height: 52px; }
+  .field-input { font-size: 16px !important; min-height: 44px; }
+  .tag-add-input { font-size: 16px !important; }
+  
+  /* Drive prompt modal */
+  .drive-prompt-box { margin: 12px; }
+  
+  /* Turnos */
+  #turno2Config, #turno3Config { padding: 10px 0 0; }
+  
+  /* Bottom save bar */
+  .save-bar { padding: 10px 12px; }
+  #saveConfigBtn { min-height: 44px; }
+  #saveCommentBtn { min-height: 44px; }
+}
+
+@media (max-width: 768px) {
+  /* Push content below sticky top bar */
+  .main { padding-top: 0 !important; }
+  .page { padding: 16px 14px 80px; }
+  .page-title { font-size: 18px; }
+  .page-sub { font-size: 12px; }
+}
 
 </style>
 </head>
@@ -215,6 +331,16 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
   </div>
 </div>
 
+<!-- Mobile drawer overlay -->
+<div id="drawerOverlay" onclick="closeMobileDrawer()"></div>
+
+<div class="mobile-top-bar">
+  <button class="hamburger-btn" onclick="toggleMobileDrawer()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="mobile-top-bar-title" id="mobilePageTitle">PlanniCissab</div>
+  <button class="mobile-save-btn" onclick="guardarConfig()">💾 Guardar</button>
+</div>
 <nav class="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">⚙ Backend</div>
@@ -520,6 +646,11 @@ function showPage(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   document.querySelector(`[data-page="${id}"]`).classList.add('active');
+  // Mobile: close drawer + update title
+  closeMobileDrawer();
+  const titles = {grupos:'Grupos y Madrijim',actividades:'Tipos de actividad',momentos:'Momentos',turnos:'Turnos',usuarios:'Usuarios',drive:'Drive',correccion:'Corregir'};
+  const mTitle = document.getElementById('mobilePageTitle');
+  if (mTitle) mTitle.textContent = titles[id] || 'Backend';
   // Toggle bottom bar buttons
   const inCorrection = id === 'correccion';
   const saveBar = document.getElementById('saveBar');
@@ -641,6 +772,8 @@ function renderUsuarios() {
   const list = document.getElementById('usuariosList');
   if (!list) return;
   list.innerHTML = '';
+  const isMobile = window.innerWidth <= 768;
+  const gridStyle = isMobile ? 'display:flex;flex-direction:column;gap:10px;' : 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
   Object.keys(config.grupos).forEach(grupo => {
     const u = config.usuarios[grupo] || { email: '', pw: '' };
     const card = document.createElement('div');
@@ -648,7 +781,7 @@ function renderUsuarios() {
     card.style.padding = '16px';
     card.innerHTML = `
       <div class="card-title" style="margin-bottom:12px;">👥 ${escBe(grupo)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="${gridStyle}">
         <div>
           <div class="field-label">Mail de acceso</div>
           <input class="field-input" value="${escBe(u.email||'')}" placeholder="mail@grupo.com"
@@ -656,7 +789,7 @@ function renderUsuarios() {
         </div>
         <div>
           <div class="field-label">Contraseña</div>
-          <input class="field-input" value="${escBe(u.pw||'')}" placeholder="contraseña"
+          <input class="field-input" type="text" value="${escBe(u.pw||'')}" placeholder="contraseña"
             oninput="setUsuario('${escBe(grupo)}','pw',this.value)"/>
         </div>
       </div>`;
@@ -822,6 +955,20 @@ function silentReconnectDrive() {
   beTokenClient.requestAccessToken({ prompt: '' }); // '' = no prompt if already authorized
 }
 
+
+// ── MOBILE DRAWER ──
+function toggleMobileDrawer() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('drawerOverlay');
+  const isOpen = sidebar.classList.contains('open');
+  if (isOpen) { closeMobileDrawer(); }
+  else { sidebar.classList.add('open'); overlay.classList.add('open'); document.body.style.overflow='hidden'; }
+}
+function closeMobileDrawer() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
 function conectarDriveBe() {
   if (!window.google) { showToastBe('Cargando Google...'); setTimeout(conectarDriveBe, 1000); return; }
   if (!beTokenClient) {
@@ -1273,61 +1420,41 @@ async function guardarCorreccion() {
   btn.disabled = true;
 
   try {
-    // Load jsPDF + html2canvas
     if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
 
-    // Build printable HTML with comments highlighted
     const pdfBlob = await generarPdfConComentarios(currentCorrectionPlan);
-    const nuevoNombre = currentCorrectionFileName.replace('.pdf','') + ' (con comentarios).pdf';
+    const nuevoNombre = currentCorrectionFileName.replace(/\.pdf$/i,'') + ' (con comentarios).pdf';
 
-    // Get parent folder
-    const parentFolderData = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents`);
-    const parentId = (parentFolderData.parents || [])[0];
-
-    // Upload new file
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify({
-      name: nuevoNombre, parents: parentId ? [parentId] : [], mimeType: 'application/pdf'
-    })], { type: 'application/json' }));
-    form.append('file', pdfBlob);
-    const uploaded = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: form
-    }).then(r => r.json());
-
-    if (uploaded.id) {
-      // Get parents of the file being corrected
-      const origFileInfo = await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}?fields=parents,name`);
-      const directParents = origFileInfo.parents || [];
-      // Search for other copies of the same filename anywhere in Drive
-      const origName = currentCorrectionFileName;
-      const qDel = `name='${origName.replace(/'/g,"\'")}' and trashed=false`;
-      const sDel = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qDel)}&fields=files(id,parents)&pageSize=50`);
-      // Collect all unique parent folders
-      const allParents = new Set(directParents);
-      for (const f of (sDel.files||[])) {
-        (f.parents||[]).forEach(p => allParents.add(p));
-        if (f.id !== currentCorrectionFileId) {
-          await beApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
-        }
-      }
-      // Delete the original file
-      await beApi(`https://www.googleapis.com/drive/v3/files/${currentCorrectionFileId}`, { method: 'DELETE' });
-      // Upload (con comentarios) to each unique parent folder
-      let uploadCount = 0;
-      for (const parentId of allParents) {
-        const f2 = new FormData();
-        f2.append('metadata', new Blob([JSON.stringify({name:nuevoNombre,parents:[parentId],mimeType:'application/pdf'})],{type:'application/json'}));
-        f2.append('file', pdfBlob);
-        const r2 = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${beGAccessToken}`},body:f2});
-        const d2 = await r2.json();
-        if (d2.id) uploadCount++;
-      }
-      showToastBe(`✓ Guardado "${nuevoNombre}" en ${uploadCount} carpeta(s). Original eliminado.`);
-      volverExplorer();
-    } else {
-      throw new Error('No se pudo subir el archivo');
+    // Helper: PATCH a file's content + rename in-place (no new file created)
+    // Works regardless of who owns the file — avoids permission issues
+    async function patchFile(fileId, name, blob) {
+      const pf = new FormData();
+      pf.append('metadata', new Blob([JSON.stringify({ name, mimeType: 'application/pdf' })], { type: 'application/json' }));
+      pf.append('file', blob);
+      const r = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { Authorization: `Bearer ${beGAccessToken}` }, body: pf }
+      );
+      return r.json();
     }
+
+    // 1. PATCH the file being corrected (rename + new content)
+    await patchFile(currentCorrectionFileId, nuevoNombre, pdfBlob);
+
+    // 2. Find and PATCH any other copies of the same original filename
+    const origName = currentCorrectionFileName;
+    const qOther = `name='${origName.replace(/'/g,"\'")}' and trashed=false`;
+    const sOther = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qOther)}&fields=files(id)&pageSize=50`);
+    let patched = 1;
+    for (const f of (sOther.files||[])) {
+      if (f.id === currentCorrectionFileId) continue;
+      await patchFile(f.id, nuevoNombre, pdfBlob);
+      patched++;
+    }
+
+    showToastBe(`✓ "${nuevoNombre}" — actualizado en ${patched} ubicación(es)`);
+    volverExplorer();
   } catch(e) {
     showToastBe('Error: ' + e.message);
   } finally {
