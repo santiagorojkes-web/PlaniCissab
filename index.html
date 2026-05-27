@@ -659,10 +659,114 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .corregir-btn { background:#e8630a; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; font-family:'DM Sans',sans-serif; white-space:nowrap; }
 .no-corregir { font-size:12px; color:var(--text-faint); text-align:center; padding:10px; }
 
+
+/* ── MOBILE INDEX EXTRA FIXES ── */
+@media (max-width: 768px) {
+
+  /* Login */
+  .login-overlay { padding: 16px; }
+  .login-box { padding: 24px 20px; }
+  .login-input, .login-select { font-size: 16px !important; /* prevents zoom on iOS */ }
+  .login-btn { padding: 14px; font-size: 16px; min-height: 48px; }
+
+  /* Start modal */
+  .start-modal { padding: 0 12px 24px; }
+  .option-btn { min-height: 64px; padding: 16px; font-size: 14px; }
+
+  /* Shift toggle */
+  .shift-wrap { padding: 10px 12px; }
+  .shift-toggle { gap: 6px; }
+  .shift-btn { padding: 8px 14px; font-size: 12px; min-height: 36px; }
+  #shiftLabel { font-size: 11px; }
+
+  /* Bottom bar */
+  .bottom-bar { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  .bottom-bar .btn { font-size: 12px; padding: 8px 10px; min-height: 40px; flex: 1; justify-content: center; }
+
+  /* Info card fields */
+  .field-input, .cell-input, .cell-ta { font-size: 16px !important; }
+
+  /* Momento cards on mobile */
+  .mcell { padding: 10px 14px; }
+  .cell-label { font-size: 10px; }
+  .cell-input, .cell-ta { font-size: 14px; }
+
+  /* Add momento button */
+  .add-momento-btn { width: 100%; justify-content: center; min-height: 44px; font-size: 14px; }
+
+  /* Materials/roles rows */
+  .mat-row, .rol-row { padding: 8px 0; }
+  .mat-add-row, .rol-add-row { flex-wrap: wrap; }
+  .mat-add-input { font-size: 16px !important; }
+
+  /* Coordinator comments */
+  .coord-comment-done { width: 28px; height: 28px; font-size: 14px; }
+
+  /* Drive config popup */
+  #driveConfigPrompt > div { margin: 0 !important; }
+
+  /* Corregir modal */
+  #corregirModal > div { max-height: 90vh; }
+}
+
+/* ── FAB: Agregar momento (mobile only) ── */
+.fab-add-momento {
+  display: none;
+}
+@media (max-width: 768px) {
+  /* Hide the inline add button on mobile */
+  .add-momento-row { display: none !important; }
+
+  /* Show floating action button instead */
+  .fab-add-momento {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 20px;
+    bottom: 76px; /* above bottom-bar */
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 28px;
+    font-weight: 300;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(232,99,10,.45);
+    z-index: 90;
+    transition: transform .15s, box-shadow .15s;
+    line-height: 1;
+  }
+  .fab-add-momento:active {
+    transform: scale(.92);
+    box-shadow: 0 2px 8px rgba(232,99,10,.35);
+  }
+}
+
+
+@media (max-width: 768px) {
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    margin: 0;
+    z-index: 80;
+    gap: 6px;
+    box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+  }
+  /* Ensure content doesn't go under fixed bottom bar */
+  #mainPage { padding-bottom: 70px; }
+}
+
 </style>
 </head>
 </head>
 <body>
+<button class="fab-add-momento" onclick="addMomento()" title="Agregar momento">+</button>
 <div id="driveConfigPrompt" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
   <div style="background:#fff;border-radius:20px;width:100%;max-width:360px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
     <div style="background:#e8630a;padding:20px;text-align:center;">
@@ -921,6 +1025,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 </div>
 
 <!-- Drive config popup -->
+<button class="fab-add-momento" onclick="addMomento()" title="Agregar momento">+</button>
 <div id="driveConfigPrompt" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
   <div style="background:#fff;border-radius:20px;width:100%;max-width:360px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
     <div style="background:#e8630a;padding:20px;text-align:center;">
@@ -1287,21 +1392,22 @@ async function deleteSyncFiles(uploadedFolderNames) {
       for (const f of (s1.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
     } catch(e) {}
   }
-  // Delete ALL "(con comentarios)" versions of this planificacion from ALL Drive folders
+  // Replace all "(con comentarios)" versions with the final corrected content
+  // The coordinator PATCHed the original file (still owned by madrijim), so DELETE works
   const baseName = pendingName || '';
   if (baseName && gAccessToken) {
     try {
-      // Search by exact name match
       const comentName = baseName + ' (con comentarios).pdf';
       const q = `name='${comentName.replace(/'/g,"\'")}' and trashed=false`;
-      const s = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50`);
-      let deleted = 0;
+      const s = await driveApi(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`
+      );
       for (const f of (s.files||[])) {
-        await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
-        deleted++;
+        // DELETE the (con comentarios) file — it's still owned by the madrijim
+        await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
       }
-      if (deleted > 0) showToast(`✓ Eliminados ${deleted} archivo(s) con comentarios de Drive`);
-    } catch(e) { console.error('Error deleting comentarios:', e); }
+      window._correctionDriveFileId = null;
+    } catch(e) {}
   }
 }
 
@@ -2350,6 +2456,7 @@ function nuevaPlanificacion() {
      'cissab_v2_objetivo','cissab_v2_hilo'].forEach(k => localStorage.removeItem(k));
   } catch(e){}
   // Reset both plans
+  window._correctionDriveFileId = null; window._correctionDriveFileName = null;
   planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState(), tercer: emptyPlanState() };
   currentShift = 'tarde';
   madrijim=[]; momentos=[]; nextId=1;
@@ -3172,8 +3279,10 @@ async function importarPlaniConComentarios(fileId, fileName) {
       headers: { Authorization: `Bearer ${gAccessToken}` }
     });
     const arrayBuffer = await resp.arrayBuffer();
-    // Reuse existing PDF import logic
     await handlePdfArrayBuffer(arrayBuffer, fileName);
+    // Remember Drive file ID so re-upload can PATCH it instead of creating new
+    window._correctionDriveFileId = fileId;
+    window._correctionDriveFileName = fileName;
     cerrarCorregirModal();
     showToast('✓ Planificación con comentarios cargada');
   } catch(e) {
