@@ -3226,16 +3226,12 @@ async function cargarPlanisConComentarios() {
   try {
     await initAreaFolder();
     if (!carpetaAreaId) throw new Error('No se encontró la carpeta del área');
-    // Only search WITHIN the area folder hierarchy
-    await initAreaFolder();
-    if (!carpetaAreaId) throw new Error('No se encontró carpeta del área');
     const grupoFilter = selectedGrupos.length > 0 ? selectedGrupos : (currentUser&&currentUser.grupo?[currentUser.grupo]:[]);
-    // Build group name filter + restrict to area folder descendants
+    // Search by group name + "(con comentarios)" — no folder restriction (Drive API doesn't support recursive ancestor search on My Drive)
     let allFiles = [];
     for (const grupo of (grupoFilter.length ? grupoFilter : [''])) {
       const nameFilter = grupo ? `name contains '${grupo}' and ` : '';
-      // '${carpetaAreaId}' in ancestors restricts to files within the area folder tree
-      const q = `${nameFilter}name contains '(con comentarios)' and mimeType='application/pdf' and trashed=false and '${carpetaAreaId}' in ancestors`;
+      const q = `${nameFilter}name contains '(con comentarios)' and mimeType='application/pdf' and trashed=false`;
       const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=50`);
       allFiles.push(...(r.files||[]));
     }
