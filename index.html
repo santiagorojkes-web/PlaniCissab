@@ -2847,6 +2847,7 @@ async function handlePdfFile(file, keepAsignados=true) {
     setVal('tema',  parsed.tema);
     setVal('objetivo', parsed.objetivo);
     setVal('hilo', parsed.hilo);
+    window._comentariosGenerales = parsed._comentariosGenerales || [];
 
     if (parsed.madrijim.length) madrijim = parsed.madrijim;
 
@@ -2902,6 +2903,8 @@ async function handlePdfFile(file, keepAsignados=true) {
     setTimeout(() => {
       cerrarImportModal();
       closeModal();
+      // Re-render AFTER mainPage is visible so coordGeneralComments shows
+      requestAnimationFrame(() => { renderAll(); renderTeam(); });
     }, 1800);
 
   } catch(err) {
@@ -3350,6 +3353,9 @@ async function importarPlaniConComentarios(fileId, fileName) {
     window._correctionDriveFileId = fileId;
     window._correctionDriveFileName = fileName;
     cerrarCorregirModal();
+    // Show mainPage and re-render to display coordGeneralComments
+    closeModal();
+    requestAnimationFrame(() => { renderAll(); renderTeam(); });
     showToast('✓ Planificación con comentarios cargada');
   } catch(e) {
     showToast('Error al descargar: ' + e.message);
