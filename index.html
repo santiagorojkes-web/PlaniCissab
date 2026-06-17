@@ -952,6 +952,10 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
       <input class="hilo-input" type="text" id="hilo" placeholder="La idea que une todos los momentos de la actividad..."/>
     </div>
   </div>
+  <div id="coordGeneralComments" style="display:none;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 0 8px 8px;padding:10px 14px;font-size:13px;">
+    <div style="font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#92400e;margin-bottom:6px;">💬 Comentarios del coordinador</div>
+    <div id="coordGeneralCommentsList"></div>
+  </div>
 </div>
 
 <div class="team-card">
@@ -1392,10 +1396,10 @@ async function deleteSyncFiles(uploadedFolderNames) {
       for (const f of (s1.files||[])) await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:'DELETE'});
     } catch(e) {}
   }
-  // Replace all "(con comentarios)" versions with the final corrected content
-  // The coordinator PATCHed the original file (still owned by madrijim), so DELETE works
+  // PATCH all "(con comentarios)" versions back to original name + final content
+  // PATCH works even if file is owned by moadon (editor access to folder is enough)
   const baseName = pendingName || '';
-  if (baseName && gAccessToken) {
+  if (baseName && gAccessToken && pendingBlob) {
     try {
       const comentName = baseName + ' (con comentarios).pdf';
       const q = `name='${comentName.replace(/'/g,"\'")}' and trashed=false`;
@@ -1403,11 +1407,19 @@ async function deleteSyncFiles(uploadedFolderNames) {
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`
       );
       for (const f of (s.files||[])) {
-        // DELETE the (con comentarios) file — it's still owned by the madrijim
-        await driveApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
+        // PATCH: rename back to original + replace content with final version
+        const pf = new FormData();
+        pf.append('metadata', new Blob([JSON.stringify({
+          name: baseName + '.pdf', mimeType:'application/pdf'
+        })], {type:'application/json'}));
+        pf.append('file', pendingBlob);
+        await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${f.id}?uploadType=multipart`,
+          { method:'PATCH', headers:{Authorization:`Bearer ${gAccessToken}`}, body:pf }
+        );
       }
       window._correctionDriveFileId = null;
-    } catch(e) {}
+    } catch(e) { console.error('Error patching comentarios back:', e); }
   }
 }
 
@@ -1488,7 +1500,7 @@ function applySyncData(data){
   if(data.momentos){
     momentos=data.momentos.map((m,i)=>({
       ...m, id:i+1,
-      materiales:(m.materiales||[]).map(it=>({text:it.text||it,asignados:[]})),
+      materiales:(m.materiales||[]).map(it=>({text:it.text||it,asignados:keepAsignados?(it.asignados||[]):[]})),
       roles:(m.roles||[]).map(it=>({text:it.text||it,asignados:[]}))
     }));
     nextId=momentos.length+1;renderAll();
@@ -2420,6 +2432,23 @@ function showModal(force) {
   // After user makes a choice, only show modal again if explicitly forced (← Inicio btn)
   if (!force && !_showModalAllowed) return;
   _showModalAllowed = false; // block subsequent auto-calls until logout
+  // Show coordinator general comments if any
+  const cgc = document.getElementById('coordGeneralComments');
+  const cgcList = document.getElementById('coordGeneralCommentsList');
+  const generalComments = window._comentariosGenerales || [];
+  if (cgc && cgcList) {
+    if (generalComments.length > 0) {
+      cgc.style.display = 'block';
+      cgcList.innerHTML = generalComments.map((c, i) => `
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;">
+          <span style="flex:1;color:#78350f;line-height:1.4;">${esc(c)}</span>
+          <button onclick="marcarComentarioGeneral(${i})" title="Marcar como resuelto"
+            style="background:#16a34a;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">✓</button>
+        </div>`).join('');
+    } else {
+      cgc.style.display = 'none';
+    }
+  }
   const hasSaved = hasSavedData();
   const badge = document.getElementById('savedBadge');
   const btnC  = document.getElementById('btnContinuar');
@@ -2767,7 +2796,7 @@ function parsePdfText(text) {
   return result;
 }
 
-async function handlePdfFile(file) {
+async function handlePdfFile(file, keepAsignados) {
   if (!file) return;
   const status = document.getElementById('importStatus');
   status.className = 'import-status loading';
@@ -2818,11 +2847,11 @@ async function handlePdfFile(file) {
         horaCierre: m.horaCierre || '',
         desc:       m.desc  || '',
         lugar:      m.lugar || '',
-        materiales: (m.materiales||[]).map(it=>({text:it.text||String(it)||'',asignados:[]})),
+        materiales: (m.materiales||[]).map(it=>({text:it.text||String(it)||'',asignados:keepAsignados?(it.asignados||[]):[]})),
         int:        m.int   || '',
         intOpen:    !!(m.int),
         _comentarios: m._comentarios || [],
-        roles:      (m.roles||[]).map(it=>({text:it.text||String(it)||'',asignados:[]})),
+        roles:      (m.roles||[]).map(it=>({text:it.text||String(it)||'',asignados:keepAsignados?(it.asignados||[]):[]})),
         din:        m.din   || '',
         addingMat: false, addingRol: false
       }));
@@ -2832,6 +2861,29 @@ async function handlePdfFile(file) {
     saveAll();
     renderTeam();
     renderAll();
+
+    // Auto-detect activity type from filename
+    if (file && file.name) {
+      const fname = file.name.replace(/\.pdf$/i,'').replace(' (con comentarios)','');
+      const parts = fname.split(' ');
+      const dateIdx = parts.findIndex(p => /^\d{1,2}-\d{1,2}$/.test(p));
+      const grupoNames = ALL_GRUPOS.map(g => g.toLowerCase());
+      let grupoEnd = 0;
+      for (let len = parts.length; len > 0; len--) {
+        if (grupoNames.includes(parts.slice(0,len).join(' ').toLowerCase())) { grupoEnd=len; break; }
+      }
+      const middleParts = dateIdx > grupoEnd ? parts.slice(grupoEnd, dateIdx) : [];
+      const middleStr = middleParts.join(' ');
+      const kS = {'Chill':'Actividad Chill','Deportiva':'Actividad Deportiva','Jaguim':'Actividad Jaguim','Picante':'Actividad Picante','Terror':'Actividad de Terror'};
+      let dT = null, jT = '';
+      for (const [s,f2] of Object.entries(kS)) { if (middleStr===s||middleParts.includes(s)){dT=f2;break;} }
+      if (!dT && middleStr) { dT='Actividad Jaguim'; jT=middleStr; }
+      if (dT && TIPOS_ACT.includes(dT)) {
+        selectedTipoAct = dT; renderTipoActChips();
+        const jw=document.getElementById('jagWrap'); if(jw) jw.classList.toggle('visible',dT==='Actividad Jaguim');
+        if (dT==='Actividad Jaguim'&&jT) { const jti=document.getElementById('jagText'); if(jti) jti.value=jT; }
+      }
+    }
 
     status.className = 'import-status success';
     status.innerHTML = `✓ Importados ${parsed.momentos.length} momento(s). Revisá y completá los campos si es necesario.`;
@@ -3035,6 +3087,13 @@ function loadShiftsFromStorage() {
   } catch(e) {}
 }
 
+
+function marcarComentarioGeneral(idx) {
+  if (!window._comentariosGenerales) return;
+  window._comentariosGenerales.splice(idx, 1);
+  saveAll();
+  renderAll();
+}
 
 function marcarComentario(momentoId, commentIdx) {
   const m = momentos.find(x => x.id === momentoId);
@@ -3287,10 +3346,10 @@ async function importarPlaniConComentarios(fileId, fileName) {
 }
 
 // Wrapper so we can call from corregir flow
-async function handlePdfArrayBuffer(arrayBuffer, fileName) {
+async function handlePdfArrayBuffer(arrayBuffer, fileName, keepAsignados) {
   const blob = new Blob([arrayBuffer], {type:'application/pdf'});
   const file = new File([blob], fileName || 'planificacion.pdf', {type:'application/pdf'});
-  await handlePdfFile(file);
+  await handlePdfFile(file, keepAsignados);
 }
 
 function showDriveConfigPrompt() {
