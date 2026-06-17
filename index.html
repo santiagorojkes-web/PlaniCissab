@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>PlanniCissab — Hoja de Planificación</title>
+<title>PlaniCissab — Hoja de Planificación</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -792,7 +792,7 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
     <div class="login-logo">
       <img src="https://cissab.org.ar/wp-content/uploads/2020/05/LOGO-CISSAB-BLANCO-FONDO-TRANSPARENTE-1-1.png" alt="Cissab" onerror="this.style.display='none'" style="filter:invert(1) sepia(1) saturate(5) hue-rotate(340deg);"/>
     </div>
-    <div class="login-title">Bienvenido a PlanniCissab</div>
+    <div class="login-title">Bienvenido a PlaniCissab</div>
     <div class="login-sub">Ingresá con el mail de tu grupo</div>
     <div class="login-field">
       <label>Área</label>
@@ -2807,7 +2807,7 @@ function parsePdfText(text) {
   return result;
 }
 
-async function handlePdfFile(file, keepAsignados) {
+async function handlePdfFile(file, keepAsignados=true) {
   if (!file) return;
   const status = document.getElementById('importStatus');
   status.className = 'import-status loading';
