@@ -1550,7 +1550,9 @@ async function generarPdfConComentarios(plan) {
   // Embed plan data in metadata
   plan._corregida = true;
   plan._archivoCon = currentCorrectionFileName.replace('.pdf','') + ' (con comentarios)';
-  pdf.setProperties({ subject: btoa(unescape(encodeURIComponent(JSON.stringify(plan)))), keywords:'cissab-planificacion-v2' });
+  // Ensure _v:2 marker so madrijim sheet recognizes the metadata format
+  const planWithVersion = Object.assign({}, plan, { _v: 2 });
+  pdf.setProperties({ subject: btoa(unescape(encodeURIComponent(JSON.stringify(planWithVersion)))), keywords:'cissab-planificacion-v2' });
   return pdf.output('blob');
 }
 
