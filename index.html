@@ -1082,14 +1082,23 @@ function doLogin() {
   const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
   const pw    = (document.getElementById('loginPass').value||'').trim();
   const err   = document.getElementById('loginError');
-  const user  = USERS.find(u => u.email.toLowerCase()===email && u.pw===pw);
+  const selArea = (document.getElementById('loginArea')||{}).value || '';
+  // Require area selection
+  if (!selArea) { err.textContent='Seleccioná un área antes de entrar.'; return; }
+  // Find user by email+password
+  const user = USERS.find(u => u.email.toLowerCase()===email && u.pw===pw);
   if (!user) { err.textContent='Mail o contraseña incorrectos.'; return; }
+  // Validate user belongs to selected area (only for non-admins)
+  const userArea = user.area || 'Moadon';
+  if (!user.isAdmin && userArea !== selArea) {
+    err.textContent=`Este mail no corresponde al área "${selArea}".`; return;
+  }
   err.textContent='';
   currentUser = user;
-  const area = (document.getElementById('loginArea')||{}).value || '';
+  const _area = selArea;
+  window._currentArea = _area;
   if (document.getElementById('loginRemember').checked)
-    localStorage.setItem('cissab_session', JSON.stringify({email:user.email,pw:user.pw,area}));
-  window._currentArea = area;
+    localStorage.setItem('cissab_session', JSON.stringify({email:user.email, pw:user.pw, area:_area}));
   afterLogin();
   showDriveConfigPrompt();
 }
@@ -1369,6 +1378,8 @@ async function confirmarSubidaDrive(){
     }catch(e){ failedFolders.push(name); }
   }
   cerrarDriveFolderModal();
+  // Delete/PATCH the (con comentarios) version after successful upload
+  if (ok > 0) await deleteSyncFiles(sel);
   if(ok>0 && failedFolders.length===0){
     showToast(`✓ "${pendingName||'Planificación'}" subido a ${ok} carpeta${ok>1?'s':''}`);
   } else if(ok>0 && failedFolders.length>0){
@@ -3112,10 +3123,10 @@ function applyAreaConfig(cfg) {
 
   // Update login credentials from config (usuarios field)
   if (cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
-    // Remove non-admin users and replace with config usuarios
     const admins = USERS.filter(u => u.isAdmin);
+    const area = window._currentArea || 'Moadon';
     const newUsers = Object.entries(cfg.usuarios).map(([grupo, u]) => ({
-      email: u.email, pw: u.pw, grupo, isAdmin: false
+      email: u.email, pw: u.pw, grupo, area, isAdmin: false
     })).filter(u => u.email && u.pw);
     USERS.length = 0;
     [...newUsers, ...admins].forEach(u => USERS.push(u));
