@@ -1354,22 +1354,50 @@ async function confirmarSubidaDrive(){
   // Always reload folder list before uploading to avoid stale cache
   await loadDriveFolders();
   const failedFolders = [];
+  // If imported from "Corregir plani", try PATCH the same file first (avoids duplicates)
+  const correctionFileId = window._correctionDriveFileId || null;
+  if (correctionFileId) {
+    try {
+      const pf = new FormData();
+      // Rename back to original name (without " (con comentarios)")
+      const originalName = (pendingName || 'Planificación') + '.pdf';
+      pf.append('metadata', new Blob([JSON.stringify({ name: originalName, mimeType:'application/pdf' })], {type:'application/json'}));
+      pf.append('file', pendingBlob);
+      const pr = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${correctionFileId}?uploadType=multipart`,
+        { method:'PATCH', headers:{Authorization:`Bearer ${gAccessToken}`}, body:pf }
+      );
+      const pd = await pr.json();
+      if (pd.id || pd.name) {
+        ok++;
+        window._correctionDriveFileId = null;
+        cerrarDriveFolderModal();
+        showToast(`✓ Planificación corregida guardada en Drive`);
+        await deleteSyncFiles(sel);
+        return;
+      }
+    } catch(e) { console.warn('PATCH directo falló, usando upload normal:', e); }
+  }
+
+  // Standard upload to selected folders
   for(const name of sel){
     try{
       let fid = driveRootFolders[name.toLowerCase()];
       if(!fid){
-        // Try case-insensitive search across all cached keys
         const key = Object.keys(driveRootFolders).find(k => k === name.toLowerCase());
         fid = key ? driveRootFolders[key] : null;
       }
       if(!fid){ failedFolders.push(name); continue; }
-      // Use monthly subfolder for group folders; direct upload for activity folders
       let targetFid = fid;
       if(mesNombre && grupoNamesLower.includes(name.toLowerCase())) {
         targetFid = (await getOrCreateMonthFolder(fid, mesNombre)) || fid;
       }
+      // Use "corregida" suffix so it's distinguishable + won't conflict with (con comentarios)
+      const uploadName = correctionFileId
+        ? (pendingName || 'Planificación') + ' corregida.pdf'
+        : (pendingName || 'Planificación') + '.pdf';
       const form=new FormData();
-      form.append('metadata',new Blob([JSON.stringify({name:pendingName+'.pdf',parents:[targetFid],mimeType:'application/pdf'})],{type:'application/json'}));
+      form.append('metadata',new Blob([JSON.stringify({name:uploadName,parents:[targetFid],mimeType:'application/pdf'})],{type:'application/json'}));
       form.append('file',pendingBlob);
       const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${gAccessToken}`},body:form});
       const d=await r.json();
@@ -1378,7 +1406,7 @@ async function confirmarSubidaDrive(){
     }catch(e){ failedFolders.push(name); }
   }
   cerrarDriveFolderModal();
-  // Delete/PATCH the (con comentarios) version after successful upload
+  // After upload, delete/rename the (con comentarios) file
   if (ok > 0) await deleteSyncFiles(sel);
   if(ok>0 && failedFolders.length===0){
     showToast(`✓ "${pendingName||'Planificación'}" subido a ${ok} carpeta${ok>1?'s':''}`);
@@ -1387,7 +1415,6 @@ async function confirmarSubidaDrive(){
   } else {
     showToast('Error: no se pudo subir a ninguna carpeta. Verificá la conexión con Drive.');
   }
-  if(ok>0) deleteSyncFiles(sel).catch(()=>{});
   } catch(e){
     showToast('Error inesperado: ' + e.message);
   } finally {
@@ -1408,9 +1435,9 @@ async function deleteSyncFiles(uploadedFolderNames) {
     } catch(e) {}
   }
   // PATCH all "(con comentarios)" versions back to original name + final content
-  // PATCH works even if file is owned by moadon (editor access to folder is enough)
+  // Delete or rename the (con comentarios) files
   const baseName = pendingName || '';
-  if (baseName && gAccessToken && pendingBlob) {
+  if (baseName && gAccessToken) {
     try {
       const comentName = baseName + ' (con comentarios).pdf';
       const q = `name='${comentName.replace(/'/g,"\'")}' and trashed=false`;
@@ -1418,19 +1445,26 @@ async function deleteSyncFiles(uploadedFolderNames) {
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`
       );
       for (const f of (s.files||[])) {
-        // PATCH: rename back to original + replace content with final version
-        const pf = new FormData();
-        pf.append('metadata', new Blob([JSON.stringify({
-          name: baseName + '.pdf', mimeType:'application/pdf'
-        })], {type:'application/json'}));
-        pf.append('file', pendingBlob);
-        await fetch(
-          `https://www.googleapis.com/upload/drive/v3/files/${f.id}?uploadType=multipart`,
-          { method:'PATCH', headers:{Authorization:`Bearer ${gAccessToken}`}, body:pf }
+        // Try DELETE (works when file is owned by madrijim - PATCH-based flow)
+        const dr = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${f.id}`,
+          { method:'DELETE', headers:{Authorization:`Bearer ${gAccessToken}`} }
         );
+        if (dr.status !== 204 && pendingBlob) {
+          // Fallback: PATCH rename to original name (no DELETE permission on moadon-owned files)
+          const pf = new FormData();
+          pf.append('metadata', new Blob([JSON.stringify({
+            name: baseName + '.pdf', mimeType:'application/pdf'
+          })], {type:'application/json'}));
+          pf.append('file', pendingBlob);
+          await fetch(
+            `https://www.googleapis.com/upload/drive/v3/files/${f.id}?uploadType=multipart`,
+            { method:'PATCH', headers:{Authorization:`Bearer ${gAccessToken}`}, body:pf }
+          );
+        }
       }
       window._correctionDriveFileId = null;
-    } catch(e) { console.error('Error patching comentarios back:', e); }
+    } catch(e) { console.error('Error cleaning up comentarios:', e); }
   }
 }
 
