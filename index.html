@@ -1086,6 +1086,7 @@ function logout() {
   sessionStorage.removeItem('cissab_cgc');
   window._correctionDriveFileId = null;
   window._correctionDriveFileName = null;
+  window._correctionBaseName = null;
   selectedGrupos = [];
   selectedTipoAct = '';
   momentos = [];
@@ -1431,7 +1432,8 @@ async function deleteSyncFiles(uploadedFolderNames) {
   }
   // PATCH all "(con comentarios)" versions back to original name + final content
   // Delete or rename the (con comentarios) files
-  const baseName = pendingName || '';
+  // Prefer the exact stored base name (avoids filename reconstruction errors)
+  const baseName = window._correctionBaseName || pendingName || '';
   if (baseName && gAccessToken) {
     try {
       const comentName = baseName + ' (con comentarios).pdf';
@@ -1466,6 +1468,7 @@ async function deleteSyncFiles(uploadedFolderNames) {
         } catch(e) {}
       }
       window._correctionDriveFileId = null;
+      window._correctionBaseName = null;
     } catch(e) { console.error('Error cleaning up comentarios:', e); }
   }
 }
@@ -2479,7 +2482,8 @@ function showModal(force) {
   // After user makes a choice, only show modal again if explicitly forced (← Inicio btn)
   if (!force && !_showModalAllowed) return;
   _showModalAllowed = false; // block subsequent auto-calls until logout
-  window._comentariosGenerales = []; sessionStorage.removeItem('cissab_cgc'); // always clear on new start
+  window._comentariosGenerales = []; sessionStorage.removeItem('cissab_cgc');
+  window._correctionBaseName = null;
   // Show coordinator general comments if any
   const cgc = document.getElementById('coordGeneralComments');
   const cgcList = document.getElementById('coordGeneralCommentsList');
@@ -3390,12 +3394,34 @@ async function importarPlaniConComentarios(fileId, fileName) {
       headers: { Authorization: `Bearer ${gAccessToken}` }
     });
     const arrayBuffer = await resp.arrayBuffer();
-    await handlePdfArrayBuffer(arrayBuffer, fileName);
-    // Remember Drive file ID so re-upload can PATCH it instead of creating new
+    await handlePdfArrayBuffer(arrayBuffer, fileName, true); // keepAsignados=true
+    // Store file info for deletion/PATCH on re-upload
     window._correctionDriveFileId = fileId;
     window._correctionDriveFileName = fileName;
+    window._correctionBaseName = fileName
+      .replace(/\.pdf$/i, '')
+      .replace(/ \(con comentarios\)/i, '')
+      .trim();
+    // Fetch sidecar _meta.json to get coordinator general comments
+    try {
+      const metaName = fileName.replace(/\.pdf$/i, '_meta.json');
+      const qMeta = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
+      const sMeta = await driveApi(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qMeta)}&fields=files(id)&pageSize=5`
+      );
+      if ((sMeta.files||[]).length > 0) {
+        const mr = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${sMeta.files[0].id}?alt=media`,
+          { headers: { Authorization: `Bearer ${gAccessToken}` } }
+        );
+        const mj = await mr.json();
+        if (mj._comentariosGenerales && mj._comentariosGenerales.length > 0) {
+          window._comentariosGenerales = mj._comentariosGenerales;
+          sessionStorage.setItem('cissab_cgc', JSON.stringify(window._comentariosGenerales));
+        }
+      }
+    } catch(e) { /* sidecar not found, no problem */ }
     cerrarCorregirModal();
-    // Show mainPage and re-render to display coordGeneralComments
     closeModal();
     requestAnimationFrame(() => { renderAll(); renderTeam(); });
     showToast('✓ Planificación con comentarios cargada');
