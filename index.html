@@ -1440,23 +1440,30 @@ async function deleteSyncFiles(uploadedFolderNames) {
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`
       );
       for (const f of (s.files||[])) {
-        // Try DELETE (works when file is owned by madrijim - PATCH-based flow)
+        // Try DELETE first (works when madrijim owns the file)
         const dr = await fetch(
           `https://www.googleapis.com/drive/v3/files/${f.id}`,
           { method:'DELETE', headers:{Authorization:`Bearer ${gAccessToken}`} }
         );
-        if (dr.status !== 204 && pendingBlob) {
-          // Fallback: PATCH rename to original name (no DELETE permission on moadon-owned files)
-          const pf = new FormData();
-          pf.append('metadata', new Blob([JSON.stringify({
-            name: baseName + '.pdf', mimeType:'application/pdf'
-          })], {type:'application/json'}));
-          pf.append('file', pendingBlob);
-          await fetch(
-            `https://www.googleapis.com/upload/drive/v3/files/${f.id}?uploadType=multipart`,
-            { method:'PATCH', headers:{Authorization:`Bearer ${gAccessToken}`}, body:pf }
-          );
+        if (dr.status !== 204) {
+          // Fallback: metadata-only rename — lighter than content PATCH, works with editor access
+          await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+            method:'PATCH',
+            headers:{ Authorization:`Bearer ${gAccessToken}`, 'Content-Type':'application/json' },
+            body: JSON.stringify({ name: baseName + ' (reemplazada).pdf' })
+          });
         }
+        // Also delete the sidecar _meta.json if exists
+        try {
+          const metaName = f.id ? baseName + ' (con comentarios)_meta.json' : null;
+          if (metaName) {
+            const qm = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
+            const sm = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)&pageSize=5`);
+            for (const mf of (sm.files||[])) {
+              await driveApi(`https://www.googleapis.com/drive/v3/files/${mf.id}`, {method:'DELETE'});
+            }
+          }
+        } catch(e) {}
       }
       window._correctionDriveFileId = null;
     } catch(e) { console.error('Error cleaning up comentarios:', e); }
