@@ -1488,7 +1488,9 @@ async function guardarCorreccion() {
       originalFile: currentCorrectionFileName,
       grupo: currentCorrectionPlan.grupo || ''
     });
-    for (const fileId of allIds) {
+    // Collect the IDs of all files that were patched
+    const patchedIds = [currentCorrectionFileId, ...(sOther.files||[]).map(f=>f.id)];
+    for (const fileId of patchedIds) {
       try {
         const fi = await beApi(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`);
         for (const parentId of (fi.parents||[])) {
