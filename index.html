@@ -1083,6 +1083,7 @@ function logout() {
   _showModalAllowed = true;
   // Reset ALL transient state so it doesn't leak to the next login session
   window._comentariosGenerales = [];
+  sessionStorage.removeItem('cissab_cgc');
   window._correctionDriveFileId = null;
   window._correctionDriveFileName = null;
   selectedGrupos = [];
@@ -1377,31 +1378,7 @@ async function confirmarSubidaDrive(){
   await loadDriveFolders();
   const failedFolders = [];
   // If imported from "Corregir plani", try PATCH the same file first (avoids duplicates)
-  const correctionFileId = window._correctionDriveFileId || null;
-  if (correctionFileId) {
-    try {
-      const pf = new FormData();
-      // Rename back to original name (without " (con comentarios)")
-      const originalName = (pendingName || 'Planificación') + '.pdf';
-      pf.append('metadata', new Blob([JSON.stringify({ name: originalName, mimeType:'application/pdf' })], {type:'application/json'}));
-      pf.append('file', pendingBlob);
-      const pr = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${correctionFileId}?uploadType=multipart`,
-        { method:'PATCH', headers:{Authorization:`Bearer ${gAccessToken}`}, body:pf }
-      );
-      const pd = await pr.json();
-      if (pd.id || pd.name) {
-        ok++;
-        window._correctionDriveFileId = null;
-        cerrarDriveFolderModal();
-        showToast(`✓ Planificación corregida guardada en Drive`);
-        await deleteSyncFiles(sel);
-        return;
-      }
-    } catch(e) { console.warn('PATCH directo falló, usando upload normal:', e); }
-  }
-
-  // Standard upload to selected folders
+  // Simple upload to selected folders — no PATCH attempt (permissions vary)
   for(const name of sel){
     try{
       let fid = driveRootFolders[name.toLowerCase()];
@@ -1414,12 +1391,8 @@ async function confirmarSubidaDrive(){
       if(mesNombre && grupoNamesLower.includes(name.toLowerCase())) {
         targetFid = (await getOrCreateMonthFolder(fid, mesNombre)) || fid;
       }
-      // Use "corregida" suffix so it's distinguishable + won't conflict with (con comentarios)
-      const uploadName = correctionFileId
-        ? (pendingName || 'Planificación') + ' corregida.pdf'
-        : (pendingName || 'Planificación') + '.pdf';
       const form=new FormData();
-      form.append('metadata',new Blob([JSON.stringify({name:uploadName,parents:[targetFid],mimeType:'application/pdf'})],{type:'application/json'}));
+      form.append('metadata',new Blob([JSON.stringify({name:(pendingName||'Planificación')+'.pdf',parents:[targetFid],mimeType:'application/pdf'})],{type:'application/json'}));
       form.append('file',pendingBlob);
       const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:`Bearer ${gAccessToken}`},body:form});
       const d=await r.json();
@@ -2499,11 +2472,11 @@ function showModal(force) {
   // After user makes a choice, only show modal again if explicitly forced (← Inicio btn)
   if (!force && !_showModalAllowed) return;
   _showModalAllowed = false; // block subsequent auto-calls until logout
-  window._comentariosGenerales = []; // always clear on new start
+  window._comentariosGenerales = []; sessionStorage.removeItem('cissab_cgc'); // always clear on new start
   // Show coordinator general comments if any
   const cgc = document.getElementById('coordGeneralComments');
   const cgcList = document.getElementById('coordGeneralCommentsList');
-  const generalComments = window._comentariosGenerales || [];
+  const generalComments = window._comentariosGenerales || JSON.parse(sessionStorage.getItem('cissab_cgc')||'[]');
   if (cgc && cgcList) {
     if (generalComments.length > 0) {
       cgc.style.display = 'block';
@@ -2906,6 +2879,7 @@ async function handlePdfFile(file, keepAsignados=true) {
     setVal('objetivo', parsed.objetivo);
     setVal('hilo', parsed.hilo);
     window._comentariosGenerales = parsed._comentariosGenerales || [];
+    sessionStorage.setItem('cissab_cgc', JSON.stringify(window._comentariosGenerales));
 
     if (parsed.madrijim.length) madrijim = parsed.madrijim;
 
@@ -3164,7 +3138,7 @@ function loadShiftsFromStorage() {
 function marcarComentarioGeneral(idx) {
   if (!window._comentariosGenerales) return;
   window._comentariosGenerales.splice(idx, 1);
-  saveAll();
+  sessionStorage.setItem('cissab_cgc', JSON.stringify(window._comentariosGenerales));
   renderAll();
 }
 
