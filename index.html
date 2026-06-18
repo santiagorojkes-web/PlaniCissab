@@ -1051,15 +1051,25 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
 // ══════════════════════════════════════════════════════
 // USERS & LOGIN
 // ══════════════════════════════════════════════════════
+// Base users — coordinators bootstrap each area, groups loaded dynamically from Drive
 const USERS = [
-  { email:'cissabmeretz@gmail.com',   pw:'meretz',   grupo:'Meretz',   isAdmin:false },
-  { email:'leshatef.cissab@gmail.com',pw:'leshatef', grupo:'Leshatef', isAdmin:false },
-  { email:'letamid26@gmail.com',      pw:'letamid',  grupo:'Letamid',  isAdmin:false },
-  { email:'mejudashcissab@gmail.com', pw:'mejudash', grupo:'Mejudash', isAdmin:false },
-  { email:'nitzajoncissab@gmail.com', pw:'nitzajon', grupo:'Nitzajon', isAdmin:false },
-  { email:'teshukacissab@gmail.com',  pw:'teshuka',  grupo:'Teshuka',  isAdmin:false },
-  { email:'moadon@cissab.org.ar',     pw:'moadon',   grupo:null,       isAdmin:true  },
-  { email:'santiagorojkes@gmail.com', pw:'santi',    grupo:null,       isAdmin:true  },
+  // ── Moadon groups (pre-configured, overwritten when Drive config loads) ──
+  { email:'cissabmeretz@gmail.com',         pw:'meretz',   grupo:'Meretz',   area:'Moadon',       isAdmin:false },
+  { email:'leshatef.cissab@gmail.com',      pw:'leshatef', grupo:'Leshatef', area:'Moadon',       isAdmin:false },
+  { email:'letamid26@gmail.com',            pw:'letamid',  grupo:'Letamid',  area:'Moadon',       isAdmin:false },
+  { email:'mejudashcissab@gmail.com',       pw:'mejudash', grupo:'Mejudash', area:'Moadon',       isAdmin:false },
+  { email:'nitzajoncissab@gmail.com',       pw:'nitzajon', grupo:'Nitzajon', area:'Moadon',       isAdmin:false },
+  { email:'teshukacissab@gmail.com',        pw:'teshuka',  grupo:'Teshuka',  area:'Moadon',       isAdmin:false },
+
+  // ── Area coordinators (can always log in to their own area) ──
+  { email:'moadon@cissab.org.ar',           pw:'moadon',   grupo:null, area:'Moadon',       isAdmin:true },
+  { email:'bogrimmayor@cissab.org.ar',      pw:'lama',     grupo:null, area:'Bogrim Mayor', isAdmin:true },
+  { email:'bogrimmenor@cissab.org.ar',      pw:'lame',     grupo:null, area:'Bogrim Menor', isAdmin:true },
+  { email:'shorashim@cissab.org.ar',        pw:'shora',    grupo:null, area:'Shorashim',    isAdmin:true },
+  { email:'escuelademadrijim@cissab.org.ar',pw:'edma',     grupo:null, area:'EDMA',         isAdmin:true },
+
+  // ── Super admins (can access any area) ──
+  { email:'santiagorojkes@gmail.com',       pw:'santi',    grupo:null, area:'*',            isAdmin:true },
 ];
 let currentUser = null;
 
@@ -1071,6 +1081,14 @@ function logout() {
   gTokenClient = null;
   carpetaAreaId = null;
   _showModalAllowed = true;
+  // Reset ALL transient state so it doesn't leak to the next login session
+  window._comentariosGenerales = [];
+  window._correctionDriveFileId = null;
+  window._correctionDriveFileName = null;
+  selectedGrupos = [];
+  selectedTipoAct = '';
+  momentos = [];
+  madrijim = [];
   document.getElementById('mainPage').style.display='none';
   document.getElementById('startModal').style.display='none';
   document.getElementById('loginOverlay').style.display='flex';
@@ -1088,10 +1106,14 @@ function doLogin() {
   // Find user by email+password
   const user = USERS.find(u => u.email.toLowerCase()===email && u.pw===pw);
   if (!user) { err.textContent='Mail o contraseña incorrectos.'; return; }
-  // Validate user belongs to selected area (only for non-admins)
+  // Validate user belongs to selected area
   const userArea = user.area || 'Moadon';
-  if (!user.isAdmin && userArea !== selArea) {
+  const isSuperAdmin = userArea === '*'; // can access any area
+  if (!isSuperAdmin && !user.isAdmin && userArea !== selArea) {
     err.textContent=`Este mail no corresponde al área "${selArea}".`; return;
+  }
+  if (!isSuperAdmin && user.isAdmin && userArea !== selArea) {
+    err.textContent=`Este mail de coordinación es del área "${userArea}", no "${selArea}".`; return;
   }
   err.textContent='';
   currentUser = user;
@@ -2477,6 +2499,7 @@ function showModal(force) {
   // After user makes a choice, only show modal again if explicitly forced (← Inicio btn)
   if (!force && !_showModalAllowed) return;
   _showModalAllowed = false; // block subsequent auto-calls until logout
+  window._comentariosGenerales = []; // always clear on new start
   // Show coordinator general comments if any
   const cgc = document.getElementById('coordGeneralComments');
   const cgcList = document.getElementById('coordGeneralCommentsList');
@@ -2532,6 +2555,7 @@ function nuevaPlanificacion() {
   // Reset both plans
   window._correctionDriveFileId = null; window._correctionDriveFileName = null;
   planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState(), tercer: emptyPlanState() };
+  window._comentariosGenerales = [];
   currentShift = 'tarde';
   madrijim=[]; momentos=[]; nextId=1;
   selectedGrupos = (currentUser && currentUser.grupo && !currentUser.isAdmin) ? [currentUser.grupo] : [];
@@ -3034,6 +3058,7 @@ const emptyPlanState = () => ({
   fecha:'', tema:'', contenido:'', objetivo:'', hilo:''
 });
 let planStates = { tarde: emptyPlanState(), nocturna: emptyPlanState(), tercer: emptyPlanState() };
+  window._comentariosGenerales = [];
 
 function captureCurrentPlan() {
   const fechaVal = (document.getElementById('fecha')||{}).value||'';
@@ -3159,14 +3184,16 @@ function applyAreaConfig(cfg) {
   if (!cfg) return;
 
   // Update login credentials from config (usuarios field)
+  // Keep all admins + super admins, replace group users for this area only
   if (cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
-    const admins = USERS.filter(u => u.isAdmin);
     const area = window._currentArea || 'Moadon';
+    // Keep admins and users from OTHER areas
+    const keep = USERS.filter(u => u.isAdmin || u.area === '*' || (u.area && u.area !== area));
     const newUsers = Object.entries(cfg.usuarios).map(([grupo, u]) => ({
-      email: u.email, pw: u.pw, grupo, area, isAdmin: false
+      email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
     })).filter(u => u.email && u.pw);
     USERS.length = 0;
-    [...newUsers, ...admins].forEach(u => USERS.push(u));
+    [...keep, ...newUsers].forEach(u => USERS.push(u));
   }
 
   // Groups + madrijim
