@@ -301,9 +301,21 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
   <div class="login-box">
     <div class="login-logo">PlaniCissab</div>
     <div class="login-sub">Panel de Coordinadores</div>
+    <div class="login-field" id="beAreaField" style="display:none;">
+      <label class="login-label">Área</label>
+      <select class="login-input" id="beAreaSelect">
+        <option value="">Seleccioná un área...</option>
+        <option value="Moadon">Moadon</option>
+        <option value="Bogrim Mayor">Bogrim Mayor</option>
+        <option value="Bogrim Menor">Bogrim Menor</option>
+        <option value="Shorashim">Shorashim</option>
+        <option value="EDMA">EDMA</option>
+      </select>
+    </div>
     <div class="login-field">
       <label class="login-label">Mail</label>
-      <input class="login-input" type="email" id="beEmail" placeholder="coordinador@cissab.org.ar" autocomplete="email"/>
+      <input class="login-input" type="email" id="beEmail" placeholder="coordinador@cissab.org.ar" autocomplete="email"
+        oninput="checkBeSuperAdmin()"/>
     </div>
     <div class="login-field">
       <label class="login-label">Contraseña</label>
@@ -570,15 +582,29 @@ let config = null;
 // ══════════════════════════════════════════════════════
 // LOGIN
 // ══════════════════════════════════════════════════════
+function checkBeSuperAdmin() {
+  const email = (document.getElementById('beEmail').value||'').trim().toLowerCase();
+  const user = BE_USERS.find(u => u.email === email);
+  const isSuperAdmin = user && user.area === '*';
+  document.getElementById('beAreaField').style.display = isSuperAdmin ? 'block' : 'none';
+}
+
 function beLogin() {
   const email = (document.getElementById('beEmail').value||'').trim().toLowerCase();
   const pw    = (document.getElementById('bePass').value||'').trim();
   const err   = document.getElementById('beError');
   const user  = BE_USERS.find(u => u.email === email && u.pw === pw);
   if (!user) { err.textContent = 'Mail o contraseña incorrectos.'; return; }
+  // Super admin: require area selection
+  if (user.area === '*') {
+    const selArea = (document.getElementById('beAreaSelect')||{}).value || '';
+    if (!selArea) { err.textContent = 'Seleccioná un área para continuar.'; return; }
+    beUser = { ...user, area: selArea };
+  } else {
+    beUser = user;
+  }
   err.textContent = '';
-  beUser = user;
-  localStorage.setItem('be_session', JSON.stringify({ email: user.email, pw: user.pw }));
+  localStorage.setItem('be_session', JSON.stringify({ email: user.email, pw: user.pw, area: beUser.area }));
   afterBeLogin();
 }
 
@@ -586,10 +612,11 @@ function tryBeAutoLogin() {
   try {
     const s = localStorage.getItem('be_session');
     if (!s) return false;
-    const { email, pw } = JSON.parse(s);
+    const { email, pw, area } = JSON.parse(s);
     const user = BE_USERS.find(u => u.email === email && u.pw === pw);
     if (!user) { localStorage.removeItem('be_session'); return false; }
-    beUser = user;
+    // Restore area for super admins
+    beUser = (user.area === '*' && area) ? { ...user, area } : user;
     return true;
   } catch(e) { return false; }
 }
@@ -1451,6 +1478,33 @@ async function guardarCorreccion() {
       if (f.id === currentCorrectionFileId) continue;
       await patchFile(f.id, nuevoNombre, pdfBlob);
       patched++;
+    }
+
+    // Save _comentariosGenerales as sidecar _meta.json next to each (con comentarios) PDF
+    const genComentarios = currentCorrectionPlan._comentariosGenerales || [];
+    const metaNombre = nuevoNombre.replace(/\.pdf$/i, '_meta.json');
+    const metaContent = JSON.stringify({
+      _comentariosGenerales: genComentarios,
+      originalFile: currentCorrectionFileName,
+      grupo: currentCorrectionPlan.grupo || ''
+    });
+    for (const fileId of allIds) {
+      try {
+        const fi = await beApi(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`);
+        for (const parentId of (fi.parents||[])) {
+          // Remove old meta file if exists
+          const qm = `name='${metaNombre.replace(/'/g,"\'")}' and '${parentId}' in parents and trashed=false`;
+          const sm = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)`);
+          for (const mf of (sm.files||[])) await beApi(`https://www.googleapis.com/drive/v3/files/${mf.id}`, {method:'DELETE'});
+          // Upload new meta
+          const mf2 = new FormData();
+          mf2.append('metadata', new Blob([JSON.stringify({name:metaNombre,parents:[parentId],mimeType:'application/json'})],{type:'application/json'}));
+          mf2.append('file', new Blob([metaContent],{type:'application/json'}));
+          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+            method:'POST', headers:{Authorization:`Bearer ${beGAccessToken}`}, body:mf2
+          });
+        }
+      } catch(e) {}
     }
 
     showToastBe(`✓ "${nuevoNombre}" — actualizado en ${patched} ubicación(es)`);
