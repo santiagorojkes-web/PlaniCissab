@@ -1405,7 +1405,11 @@ async function subirPracticasADrive() {
     });
     const d = await r.json();
     if (d.success) showToast(`✓ Práctica "${pendingName}" subida a Drive`);
-    else throw new Error(d.error || 'Error al subir');
+    else {
+      const detail = d.googleError ? ` (${d.googleError}: ${d.googleErrorDesc||''})` : 
+                     d.debug ? ` — vars: clientId=${d.debug.hasClientId} secret=${d.debug.hasClientSecret} token=${d.debug.hasRefreshToken}` : '';
+      throw new Error((d.error || 'Error al subir') + detail);
+    }
   } catch(e) { showToast('Error al subir práctica: ' + e.message); }
 }
 async function ejecutarSubida(){
@@ -2376,10 +2380,10 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 function guardar(){
   saveAll();
   showToast('✓ Planificación guardada');
+  if (window._isPracticas) return; // PRÁCTICAS: solo local, sin Drive
   if (gAccessToken) {
     syncToDrive().catch(()=>{});
   } else {
-    // Auto-auth so sync works - user sees a brief Google popup
     window._pendingSync = true;
     window._silentAuth = true;
     iniciarGoogleAuth();
