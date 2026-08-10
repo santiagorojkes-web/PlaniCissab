@@ -1502,11 +1502,13 @@ async function guardarCorreccion() {
           const mf2 = new FormData();
           mf2.append('metadata', new Blob([JSON.stringify({name:metaNombre,parents:[parentId],mimeType:'application/json'})],{type:'application/json'}));
           mf2.append('file', new Blob([metaContent],{type:'application/json'}));
-          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+          const metaUploadResult = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
             method:'POST', headers:{Authorization:`Bearer ${beGAccessToken}`}, body:mf2
           });
+          const metaUploadJson = await metaUploadResult.json();
+          console.log('[Backend] Sidecar creado:', metaNombre, 'ID:', metaUploadJson.id || 'ERROR', metaUploadJson.error?.message||'');
         }
-      } catch(e) {}
+      } catch(e) { console.error('[Backend] Error creando sidecar para', fileId, e); }
     }
 
     showToastBe(`✓ "${nuevoNombre}" — actualizado en ${patched} ubicación(es)`);
