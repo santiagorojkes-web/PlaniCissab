@@ -784,6 +784,15 @@ body.practicas-mode #practicasSubAreaField { display:block !important; }
 #practicasSubAreaField { display:none; }
 #loginCredentials { transition:opacity .2s; }
 
+
+/* Prácticas header */
+#headerTitle { font-size: clamp(13px, 2.5vw, 18px); }
+@media (max-width: 480px) {
+  .page-header-title { text-align: right; }
+  #headerTitle { font-size: 13px; }
+  #headerTag { font-size: 10px; }
+}
+
 </style>
 </head>
 </head>
@@ -937,8 +946,8 @@ body.practicas-mode #practicasSubAreaField { display:block !important; }
 <div class="page-header">
   <img class="page-header-logo" src="https://cissab.org.ar/wp-content/uploads/2020/05/LOGO-CISSAB-BLANCO-FONDO-TRANSPARENTE-1-1.png" alt="Cissab" onerror="this.style.display='none'"/>
   <div class="page-header-title">
-    <strong>Hoja de Planificación</strong>
-    <div class="page-header-tag">#MiCorazónLateNaranja</div>
+    <strong id="headerTitle">Hoja de Planificación</strong>
+    <div class="page-header-tag" id="headerTag">#MiCorazónLateNaranja</div>
   </div>
 </div>
 
@@ -1200,8 +1209,23 @@ function tryAutoLogin() {
   } catch(e) { return false; }
 }
 
+
+// ── Update header for mode (normal vs PRÁCTICAS) ──
+function updateHeaderMode() {
+  const titleEl = document.getElementById('headerTitle');
+  const tagEl   = document.getElementById('headerTag');
+  if (!titleEl) return;
+  if (window._isPracticas) {
+    titleEl.textContent = 'Prácticas Pedagógicas';
+    if (tagEl) tagEl.textContent = window._practicasSubArea || '';
+  } else {
+    titleEl.textContent = 'Hoja de Planificación';
+    if (tagEl) tagEl.textContent = '#MiCorazónLateNaranja';
+  }
+}
 function afterLogin() {
   document.getElementById('loginOverlay').style.display='none';
+  updateHeaderMode();
   loadCachedConfig();
 
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
@@ -2601,6 +2625,7 @@ function showModal(force) {
   // After user makes a choice, only show modal again if explicitly forced (← Inicio btn)
   if (!force && !_showModalAllowed) return;
   _showModalAllowed = false; // block subsequent auto-calls until logout
+  updateHeaderMode();
   window._comentariosGenerales = []; sessionStorage.removeItem('cissab_cgc');
   window._correctionBaseName = null;
   // Show coordinator general comments if any
