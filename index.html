@@ -762,6 +762,28 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
   #mainPage { padding-bottom: 70px; }
 }
 
+
+/* ── PRÁCTICAS MODE: blue accent ── */
+body.practicas-mode { --accent:#2563eb; --accent-dark:#1d4ed8; }
+body.practicas-mode .page-header { background:linear-gradient(135deg,#2563eb,#1d4ed8); }
+body.practicas-mode .login-overlay { background:#2563eb; }
+body.practicas-mode .btn.primary { background:#2563eb; }
+body.practicas-mode .btn.primary:hover { background:#1d4ed8; }
+body.practicas-mode .grupo-chip-btn.active { background:#2563eb; border-color:#2563eb; }
+body.practicas-mode .tipo-chip.active { background:#2563eb; border-color:#2563eb; }
+body.practicas-mode .shift-btn.active { background:#2563eb; }
+body.practicas-mode .bottom-bar .btn.save { background:#2563eb; }
+body.practicas-mode .add-momento-btn { color:#2563eb; border-color:#2563eb; }
+body.practicas-mode .fab-add-momento { background:#2563eb; box-shadow:0 4px 16px rgba(37,99,235,.45); }
+body.practicas-mode .hilo-wrap { border-color:#2563eb; }
+body.practicas-mode .hilo-label { color:#2563eb; }
+body.practicas-mode .momento-tipo-badge { background:#2563eb; }
+body.practicas-mode .login-btn { background:#2563eb; }
+body.practicas-mode .login-btn:hover { background:#1d4ed8; }
+body.practicas-mode #practicasSubAreaField { display:block !important; }
+#practicasSubAreaField { display:none; }
+#loginCredentials { transition:opacity .2s; }
+
 </style>
 </head>
 </head>
@@ -796,15 +818,26 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
     <div class="login-sub">Ingresá con el mail de tu grupo</div>
     <div class="login-field">
       <label>Área</label>
-      <select class="login-input" id="loginArea" style="cursor:pointer;" onchange="window._currentArea=this.value;">
+      <select class="login-input" id="loginArea" style="cursor:pointer;" onchange="onLoginAreaChange(this.value)">
         <option value="">Seleccioná un área...</option>
         <option value="EDMA">EDMA</option>
         <option value="Moadon">Moadon</option>
         <option value="Bogrim Mayor">Bogrim Mayor</option>
         <option value="Bogrim Menor">Bogrim Menor</option>
         <option value="Shorashim">Shorashim</option>
+        <option value="PRÁCTICAS">🔵 Prácticas</option>
       </select>
     </div>
+    <div id="practicasSubAreaField" style="display:none;margin-top:10px;">
+      <label class="login-label" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;">Sub-área</label>
+      <select class="login-input" id="practicasSubArea" style="cursor:pointer;">
+        <option value="">Seleccioná sub-área...</option>
+        <option value="Bogrim Mayor">Bogrim Mayor</option>
+        <option value="Bogrim Menor">Bogrim Menor</option>
+        <option value="Shorashim">Shorashim</option>
+      </select>
+    </div>
+    <div id="loginCredentials">
     <div class="login-field">
       <label>Mail</label>
       <input class="login-input" type="email" id="loginEmail" placeholder="mail@grupo.com" autocomplete="email"/>
@@ -817,7 +850,8 @@ select.field-input{cursor:pointer;-webkit-appearance:none;appearance:none;}
       <input type="checkbox" id="loginRemember" checked/> Recordarme en este dispositivo
     </label>
     <div class="login-error" id="loginError"></div>
-    <button class="login-btn" onclick="doLogin()">Entrar</button>
+
+    </div>    <button class="login-btn" onclick="doLogin()">Entrar</button>
   </div>
 </div>
 
@@ -1084,6 +1118,9 @@ function logout() {
   // Reset ALL transient state so it doesn't leak to the next login session
   window._comentariosGenerales = [];
   sessionStorage.removeItem('cissab_cgc');
+  window._isPracticas = false;
+  window._practicasSubArea = null;
+  document.body.classList.remove('practicas-mode');
   window._correctionDriveFileId = null;
   window._correctionDriveFileName = null;
   window._correctionBaseName = null;
@@ -1098,19 +1135,40 @@ function logout() {
   document.getElementById('loginPass').value='';
   document.getElementById('loginError').textContent='';
 }
+function onLoginAreaChange(val) {
+  const isPrac = val === 'PRÁCTICAS';
+  const creds = document.getElementById('loginCredentials');
+  const subFld = document.getElementById('practicasSubAreaField');
+  if (creds) creds.style.display = isPrac ? 'none' : '';
+  if (subFld) subFld.style.display = isPrac ? 'block' : 'none';
+  window._currentArea = isPrac ? '' : val;
+}
+
 function doLogin() {
   const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
   const pw    = (document.getElementById('loginPass').value||'').trim();
   const err   = document.getElementById('loginError');
   const selArea = (document.getElementById('loginArea')||{}).value || '';
-  // Require area selection
   if (!selArea) { err.textContent='Seleccioná un área antes de entrar.'; return; }
-  // Find user by email+password
+  // ── PRÁCTICAS mode: no credentials ──
+  if (selArea === 'PRÁCTICAS') {
+    const subArea = (document.getElementById('practicasSubArea')||{}).value || '';
+    if (!subArea) { err.textContent='Seleccioná el sub-área de prácticas.'; return; }
+    err.textContent='';
+    window._isPracticas = true;
+    window._practicasSubArea = subArea;
+    window._currentArea = subArea; // use sub-area for Drive folder lookups
+    currentUser = { email:'practicas', pw:'', grupo:'', area:'PRÁCTICAS', subArea, isPracticas:true, isAdmin:false };
+    document.body.classList.add('practicas-mode');
+    afterLogin();
+    showDriveConfigPrompt();
+    return;
+  }
+  // ── Normal login with credentials ──
   const user = USERS.find(u => u.email.toLowerCase()===email && u.pw===pw);
   if (!user) { err.textContent='Mail o contraseña incorrectos.'; return; }
-  // Validate user belongs to selected area
   const userArea = user.area || 'Moadon';
-  const isSuperAdmin = userArea === '*'; // can access any area
+  const isSuperAdmin = userArea === '*';
   if (!isSuperAdmin && !user.isAdmin && userArea !== selArea) {
     err.textContent=`Este mail no corresponde al área "${selArea}".`; return;
   }
@@ -1121,6 +1179,8 @@ function doLogin() {
   currentUser = user;
   const _area = selArea;
   window._currentArea = _area;
+  window._isPracticas = false;
+  document.body.classList.remove('practicas-mode');
   if (document.getElementById('loginRemember').checked)
     localStorage.setItem('cissab_session', JSON.stringify({email:user.email, pw:user.pw, area:_area}));
   afterLogin();
@@ -1190,6 +1250,7 @@ function toggleGrupo(g) {
 }
 
 function updateMadrijimFromGrupos() {
+  if (window._isPracticas) { madrijim = []; renderTeam(); return; } // PRÁCTICAS: no madrijim
   if(selectedGrupos[0]==='General'){
     const all=[];
     ALL_GRUPOS.forEach(g=>(GRUPO_MADRIJIM[g]||[]).forEach(m=>{if(!all.includes(m))all.push(m);}));
@@ -1293,11 +1354,59 @@ async function loadDriveFolders(){
 // Keep old name as alias for compatibility
 async function ensureActivityFolders(){ return loadDriveFolders(); }
 
+
+// ── PRÁCTICAS: upload to PRACTICAS/[grupo] folder ──
+async function subirPracticasADrive() {
+  if (!gAccessToken) { showToast('Conectá Drive primero'); return; }
+  try {
+    showToast('⏳ Subiendo planificación de prácticas...');
+    await initAreaFolder(); // finds sub-area folder (e.g. Bogrim Mayor)
+    if (!carpetaAreaId) throw new Error('No se encontró la carpeta del área');
+    // Find or create PRACTICAS subfolder
+    const grupo = selectedGrupos[0] || 'General';
+    const practicasFolderId = await getOrCreateFolder('PRACTICAS', carpetaAreaId);
+    const grupoFolderId = await getOrCreateFolder(grupo, practicasFolderId);
+    // Upload PDF
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify({
+      name: pendingName + '.pdf',
+      parents: [grupoFolderId],
+      mimeType: 'application/pdf'
+    })], {type:'application/json'}));
+    form.append('file', pendingBlob);
+    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:'POST', headers:{Authorization:`Bearer ${gAccessToken}`}, body:form
+    });
+    const d = await r.json();
+    if (d.id) showToast(`✓ Práctica "${pendingName}" subida a Drive`);
+    else throw new Error(d.error?.message || 'Error al subir');
+  } catch(e) { showToast('Error al subir práctica: ' + e.message); }
+}
+
+async function getOrCreateFolder(name, parentId) {
+  const q = `name='${name.replace(/'/g,"\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`);
+  if ((r.files||[]).length > 0) return r.files[0].id;
+  // Create it
+  const cr = await driveApi('https://www.googleapis.com/drive/v3/files', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, mimeType:'application/vnd.google-apps.folder', parents:[parentId]})
+  });
+  return cr.id;
+}
 async function ejecutarSubida(){
   const btn=document.getElementById('btnDrive');
   const origHtml=btn.innerHTML;
   btn.disabled=true;btn.textContent='⏳ Preparando...';
   try{
+    if (window._isPracticas) {
+      // PRÁCTICAS: upload directly to PRACTICAS/[grupo] folder, skip modal
+      pendingName = getNombreArchivo() || 'Planificación';
+      pendingBlob = await generarPdfBlob();
+      await subirPracticasADrive();
+      return;
+    }
     await ensureActivityFolders();
     pendingName = getNombreArchivo() || 'Planificación';
     pendingBlob=await generarPdfBlob();
