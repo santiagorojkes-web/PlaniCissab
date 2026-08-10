@@ -1165,6 +1165,7 @@ function doLogin() {
     if (!subArea) { err.textContent='Seleccioná el sub-área de prácticas.'; return; }
     err.textContent='';
     window._isPracticas = true;
+    console.log('[PlaniCissab] Login PRÁCTICAS OK, _isPracticas=true, subArea=', subArea);
     window._practicasSubArea = subArea;
     window._currentArea = subArea; // use sub-area for Drive folder lookups
     currentUser = { email:'practicas', pw:'', grupo:'', area:'PRÁCTICAS', subArea, isPracticas:true, isAdmin:false };
@@ -2243,6 +2244,7 @@ async function descargarPdf() {
 
 async function subirADrive() {
   // PRÁCTICAS: salta el OAuth de Google, sube directo via Vercel
+  console.log('[PlaniCissab] subirADrive: _isPracticas=', window._isPracticas);
   if (window._isPracticas) { ejecutarSubida(); return; }
   if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID === 'TU_CLIENT_ID_AQUI') {
     showToast('⚠ Configurá el Google Client ID en el archivo');
