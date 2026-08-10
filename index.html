@@ -2242,6 +2242,8 @@ async function descargarPdf() {
 
 
 async function subirADrive() {
+  // PRÁCTICAS: salta el OAuth de Google, sube directo via Vercel
+  if (window._isPracticas) { ejecutarSubida(); return; }
   if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID === 'TU_CLIENT_ID_AQUI') {
     showToast('⚠ Configurá el Google Client ID en el archivo');
     return;
