@@ -1379,45 +1379,34 @@ async function loadDriveFolders(){
 async function ensureActivityFolders(){ return loadDriveFolders(); }
 
 
-// ── PRÁCTICAS: upload to PRACTICAS/[grupo] folder ──
+// ── PRÁCTICAS: sube via endpoint de Vercel (sin OAuth del usuario) ──
 async function subirPracticasADrive() {
-  if (!gAccessToken) { showToast('Conectá Drive primero'); return; }
   try {
     showToast('⏳ Subiendo planificación de prácticas...');
-    await initAreaFolder(); // finds sub-area folder (e.g. Bogrim Mayor)
-    if (!carpetaAreaId) throw new Error('No se encontró la carpeta del área');
-    // Find or create PRACTICAS subfolder
     const grupo = selectedGrupos[0] || 'General';
-    const practicasFolderId = await getOrCreateFolder('PRACTICAS', carpetaAreaId);
-    const grupoFolderId = await getOrCreateFolder(grupo, practicasFolderId);
-    // Upload PDF
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify({
-      name: pendingName + '.pdf',
-      parents: [grupoFolderId],
-      mimeType: 'application/pdf'
-    })], {type:'application/json'}));
-    form.append('file', pendingBlob);
-    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method:'POST', headers:{Authorization:`Bearer ${gAccessToken}`}, body:form
+    const subArea = window._practicasSubArea || 'Bogrim Mayor';
+    // Convertir el blob a base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(pendingBlob);
+    });
+    // Llamar al endpoint de Vercel (no requiere OAuth del usuario)
+    const r = await fetch('/api/upload-practicas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: (pendingName || 'Planificación') + '.pdf',
+        fileBase64: base64,
+        subArea,
+        grupo
+      })
     });
     const d = await r.json();
-    if (d.id) showToast(`✓ Práctica "${pendingName}" subida a Drive`);
-    else throw new Error(d.error?.message || 'Error al subir');
+    if (d.success) showToast(`✓ Práctica "${pendingName}" subida a Drive`);
+    else throw new Error(d.error || 'Error al subir');
   } catch(e) { showToast('Error al subir práctica: ' + e.message); }
-}
-
-async function getOrCreateFolder(name, parentId) {
-  const q = `name='${name.replace(/'/g,"\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const r = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`);
-  if ((r.files||[]).length > 0) return r.files[0].id;
-  // Create it
-  const cr = await driveApi('https://www.googleapis.com/drive/v3/files', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({name, mimeType:'application/vnd.google-apps.folder', parents:[parentId]})
-  });
-  return cr.id;
 }
 async function ejecutarSubida(){
   const btn=document.getElementById('btnDrive');
