@@ -1169,8 +1169,7 @@ function doLogin() {
     window._currentArea = subArea; // use sub-area for Drive folder lookups
     currentUser = { email:'practicas', pw:'', grupo:'', area:'PRÁCTICAS', subArea, isPracticas:true, isAdmin:false };
     document.body.classList.add('practicas-mode');
-    afterLogin();
-    showDriveConfigPrompt();
+    afterLogin(); // no Drive popup for PRÁCTICAS — uses server-side upload
     return;
   }
   // ── Normal login with credentials ──
@@ -3578,6 +3577,7 @@ async function handlePdfArrayBuffer(arrayBuffer, fileName, keepAsignados) {
 }
 
 function showDriveConfigPrompt() {
+  if (window._isPracticas) return; // PRÁCTICAS uses server-side upload, no Drive needed
   const el = document.getElementById('driveConfigPrompt');
   if (!el) return;
   const area = window._currentArea || 'Moadon';
