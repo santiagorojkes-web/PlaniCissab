@@ -1455,14 +1455,24 @@ async function deleteSyncFiles(uploadedFolderNames) {
             body: JSON.stringify({ name: baseName + ' (reemplazada).pdf' })
           });
         }
-        // Also delete the sidecar _meta.json if exists
+        // Also delete/rename the sidecar _meta.json
         try {
-          const metaName = f.id ? baseName + ' (con comentarios)_meta.json' : null;
-          if (metaName) {
-            const qm = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
-            const sm = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)&pageSize=5`);
-            for (const mf of (sm.files||[])) {
-              await driveApi(`https://www.googleapis.com/drive/v3/files/${mf.id}`, {method:'DELETE'});
+          const metaName = baseName + ' (con comentarios)_meta.json';
+          const qm = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
+          const sm = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)&pageSize=5`);
+          for (const mf of (sm.files||[])) {
+            // Try DELETE first, then rename if forbidden
+            const dm = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${mf.id}`,
+              { method:'DELETE', headers:{Authorization:`Bearer ${gAccessToken}`} }
+            );
+            if (dm.status !== 204) {
+              // Fallback: rename to mark as processed
+              await fetch(`https://www.googleapis.com/drive/v3/files/${mf.id}`, {
+                method:'PATCH',
+                headers:{ Authorization:`Bearer ${gAccessToken}`, 'Content-Type':'application/json' },
+                body: JSON.stringify({ name: baseName + ' (reemplazada)_meta.json' })
+              });
             }
           }
         } catch(e) {}
@@ -2488,6 +2498,7 @@ function showModal(force) {
   const cgc = document.getElementById('coordGeneralComments');
   const cgcList = document.getElementById('coordGeneralCommentsList');
   const generalComments = window._comentariosGenerales || JSON.parse(sessionStorage.getItem('cissab_cgc')||'[]');
+  if (generalComments.length > 0) console.log('[PlaniCissab] Mostrando', generalComments.length, 'comentario(s) generales');
   if (cgc && cgcList) {
     if (generalComments.length > 0) {
       cgc.style.display = 'block';
@@ -2865,6 +2876,7 @@ async function handlePdfFile(file, keepAsignados=true) {
       const pdfDoc = await pj.getDocument({ data: ab }).promise;
       const meta = await pdfDoc.getMetadata();
       const subject = (meta && meta.info && meta.info.Subject) || '';
+      console.log('[PlaniCissab] PDF Subject length:', subject.length, 'first 30:', subject.substring(0,30));
       if (subject && subject.length > 20) {
         try {
           const json = JSON.parse(decodeURIComponent(escape(atob(subject))));
@@ -2884,11 +2896,12 @@ async function handlePdfFile(file, keepAsignados=true) {
 
     // Load header fields
     const setVal = (id, val) => { if (val) { const el=document.getElementById(id); if(el) el.value=val; } };
-    setVal('grupo', parsed.grupo);
-    setVal('fecha', parsed.fecha);
-    setVal('tema',  parsed.tema);
-    setVal('objetivo', parsed.objetivo);
-    setVal('hilo', parsed.hilo);
+    setVal('grupo',     parsed.grupo);
+    setVal('fecha',     parsed.fecha);
+    setVal('tema',      parsed.tema);
+    setVal('objetivo',  parsed.objetivo);
+    setVal('contenido', parsed.contenido);
+    setVal('hilo',      parsed.hilo);
     window._comentariosGenerales = parsed._comentariosGenerales || [];
     sessionStorage.setItem('cissab_cgc', JSON.stringify(window._comentariosGenerales));
 
@@ -3406,21 +3419,25 @@ async function importarPlaniConComentarios(fileId, fileName) {
     try {
       const metaName = fileName.replace(/\.pdf$/i, '_meta.json');
       const qMeta = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
+      console.log('[PlaniCissab] Buscando sidecar:', metaName);
       const sMeta = await driveApi(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qMeta)}&fields=files(id)&pageSize=5`
       );
+      console.log('[PlaniCissab] Sidecar encontrado:', (sMeta.files||[]).length, 'archivos');
       if ((sMeta.files||[]).length > 0) {
         const mr = await fetch(
           `https://www.googleapis.com/drive/v3/files/${sMeta.files[0].id}?alt=media`,
           { headers: { Authorization: `Bearer ${gAccessToken}` } }
         );
         const mj = await mr.json();
+        console.log('[PlaniCissab] Sidecar contenido:', JSON.stringify(mj).substring(0,200));
         if (mj._comentariosGenerales && mj._comentariosGenerales.length > 0) {
           window._comentariosGenerales = mj._comentariosGenerales;
           sessionStorage.setItem('cissab_cgc', JSON.stringify(window._comentariosGenerales));
+          console.log('[PlaniCissab] Comentarios generales cargados:', mj._comentariosGenerales);
         }
       }
-    } catch(e) { /* sidecar not found, no problem */ }
+    } catch(e) { console.error('[PlaniCissab] Error leyendo sidecar:', e); }
     cerrarCorregirModal();
     closeModal();
     requestAnimationFrame(() => { renderAll(); renderTeam(); });
