@@ -1,11 +1,9 @@
 // Vercel serverless function — sube planificaciones de PRÁCTICAS a Drive
 // usando las credenciales de moadon guardadas en variables de entorno.
-// Los usuarios de Prácticas no necesitan OAuth propio.
 
 const ROOT_FOLDER_ID = '1hiLmTa_gwzq39fmbUadm8utnhL-XiUme'; // Planificaciones
 
 module.exports = async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -19,7 +17,19 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // ── 1. Obtener access token usando el refresh token de moadon ──
+    // ── Debug: verificar que las env vars están presentes ──
+    const hasClientId     = !!process.env.GOOGLE_CLIENT_ID;
+    const hasClientSecret = !!process.env.GOOGLE_CLIENT_SECRET;
+    const hasRefreshToken = !!process.env.GOOGLE_REFRESH_TOKEN;
+
+    if (!hasClientId || !hasClientSecret || !hasRefreshToken) {
+      return res.status(500).json({
+        error: 'Faltan variables de entorno en Vercel',
+        debug: { hasClientId, hasClientSecret, hasRefreshToken }
+      });
+    }
+
+    // ── 1. Obtener access token ──
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -32,8 +42,13 @@ module.exports = async function handler(req, res) {
     });
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
+
     if (!accessToken) {
-      return res.status(500).json({ error: 'No se pudo obtener access token', details: tokenData });
+      return res.status(500).json({
+        error: 'No se pudo obtener access token',
+        googleError: tokenData.error,
+        googleErrorDesc: tokenData.error_description
+      });
     }
 
     // ── Helpers de Drive ──
@@ -63,12 +78,12 @@ module.exports = async function handler(req, res) {
       return created.id;
     }
 
-    // ── 2. Construir estructura: ROOT/subArea/PRACTICAS/grupo ──
+    // ── 2. Estructura: ROOT/subArea/PRACTICAS/grupo ──
     const subAreaId   = await getOrCreateFolder(subArea,    ROOT_FOLDER_ID);
     const practicasId = await getOrCreateFolder('PRACTICAS', subAreaId);
     const grupoId     = await getOrCreateFolder(grupo,       practicasId);
 
-    // ── 3. Subir el PDF con multipart ──
+    // ── 3. Subir PDF ──
     const pdfBuffer = Buffer.from(fileBase64, 'base64');
     const boundary  = 'plani_cissab_boundary';
     const metadata  = JSON.stringify({ name: fileName, parents: [grupoId], mimeType: 'application/pdf' });
@@ -96,6 +111,6 @@ module.exports = async function handler(req, res) {
     }
 
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 };
