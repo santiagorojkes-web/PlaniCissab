@@ -1171,6 +1171,25 @@ function onLoginAreaChange(val) {
   if (creds) creds.style.display = isPrac ? 'none' : '';
   if (subFld) subFld.style.display = isPrac ? 'block' : 'none';
   window._currentArea = isPrac ? '' : val;
+  // Pre-load area credentials from Drive so non-Moadon users can log in
+  if (!isPrac && val && val !== 'Moadon') preloadAreaCredentials(val);
+}
+
+// Fetches the area config from Vercel to populate login credentials
+async function preloadAreaCredentials(area) {
+  try {
+    const r = await fetch('/api/get-config?subArea=' + encodeURIComponent(area));
+    const d = await r.json();
+    if (d.success && d.config && d.config.usuarios) {
+      // Add area users to USERS array (keeps existing users from other areas)
+      const existing = USERS.filter(u => u.area !== area);
+      const newUsers = Object.entries(d.config.usuarios).map(([grupo, u]) => ({
+        email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
+      })).filter(u => u.email && u.pw);
+      USERS.length = 0;
+      [...existing, ...newUsers].forEach(u => USERS.push(u));
+    }
+  } catch(e) { /* no config yet for this area */ }
 }
 
 function doLogin() {
@@ -3518,6 +3537,10 @@ async function loadConfigPublic() {
 function abrirCorregirModal() {
   const modal = document.getElementById('corregirModal');
   modal.style.display = 'flex';
+  if (window._isPracticas) {
+    abrirCorregirModalPracticas(); // uses Vercel, no Drive OAuth needed
+    return;
+  }
   if (gAccessToken) cargarPlanisConComentarios();
 }
 function cerrarCorregirModal() {
