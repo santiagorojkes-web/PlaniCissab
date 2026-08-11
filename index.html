@@ -3533,6 +3533,56 @@ async function loadConfigPublic() {
 }
 
 
+// ══ CORREGIR PLANI PARA PRÁCTICAS (via Vercel, sin OAuth del usuario) ══
+async function abrirCorregirModalPracticas() {
+  const subArea = window._practicasSubArea || (currentUser && currentUser.subArea) || '';
+  const grupo   = window._practicasGrupo   || (currentUser && currentUser.grupo)   || '';
+  const list    = document.getElementById('corregirContent');
+  if (!subArea || !grupo) {
+    if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:#c00;">Sin sub-área o grupo. Volvé a entrar.</div>';
+    return;
+  }
+  if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">⏳ Buscando planificaciones...</div>';
+  try {
+    const r = await fetch('/api/list-corrections?subArea=' + encodeURIComponent(subArea) + '&grupo=' + encodeURIComponent(grupo));
+    const d = await r.json();
+    const files = d.files || [];
+    if (!list) return;
+    if (files.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">✓ No hay planificaciones con comentarios para ' + esc(grupo) + '</div>';
+      return;
+    }
+    list.innerHTML = files.map(f => `<div onclick="importarPracticasConComentarios('${f.id}','${escapeAttr(f.name)}')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #eee;cursor:pointer;background:#fff;" onmouseover="this.style.background='#fff8f5'" onmouseout="this.style.background='#fff'">
+      <div style="font-size:22px;">📄</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:600;color:#222;">${esc(f.name)}</div><div style="font-size:11px;color:#999;">${new Date(f.modifiedTime).toLocaleDateString('es-AR')}</div></div>
+      <button style="background:#e8630a;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-family:'DM Sans',sans-serif;">Importar</button>
+    </div>`).join('');
+  } catch(e) {
+    if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:#c00;">Error: ' + esc(e.message) + '</div>';
+  }
+}
+
+async function importarPracticasConComentarios(fileId, fileName) {
+  showToast('⏳ Descargando planificación...');
+  try {
+    const r = await fetch('/api/get-file?fileId=' + fileId);
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error || 'Error al descargar');
+    const binary = atob(d.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    await handlePdfArrayBuffer(bytes.buffer, fileName, true);
+    window._correctionDriveFileId   = fileId;
+    window._correctionDriveFileName = fileName;
+    window._correctionBaseName = fileName.replace(/\.pdf$/i,'').replace(/ \(con comentarios\)/i,'').trim();
+    cerrarCorregirModal();
+    closeModal();
+    requestAnimationFrame(() => { renderAll(); renderTeam(); });
+    showToast('✓ Planificación con comentarios cargada');
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+
 // ══ CORREGIR PLANIFICACIÓN DESDE DRIVE ══
 function abrirCorregirModal() {
   const modal = document.getElementById('corregirModal');
