@@ -1451,7 +1451,12 @@ async function guardarCorreccion() {
     if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
 
     const pdfBlob = await generarPdfConComentarios(currentCorrectionPlan);
-    const nuevoNombre = currentCorrectionFileName.replace(/\.pdf$/i,'') + ' (con comentarios).pdf';
+    // Strip previous suffixes so names don't accumulate
+    const cleanBase = currentCorrectionFileName
+      .replace(/\.pdf$/i, '')
+      .replace(/ corregida$/i, '')
+      .replace(/ \(con comentarios\)$/i, '');
+    const nuevoNombre = cleanBase + ' (con comentarios).pdf';
 
     // Helper: PATCH a file's content + rename in-place (no new file created)
     // Works regardless of who owns the file — avoids permission issues
@@ -1480,37 +1485,7 @@ async function guardarCorreccion() {
       patched++;
     }
 
-    // Save _comentariosGenerales as sidecar _meta.json next to each (con comentarios) PDF
-    const genComentarios = currentCorrectionPlan._comentariosGenerales || [];
-    const metaNombre = nuevoNombre.replace(/\.pdf$/i, '_meta.json');
-    const metaContent = JSON.stringify({
-      _comentariosGenerales: genComentarios,
-      originalFile: currentCorrectionFileName,
-      grupo: currentCorrectionPlan.grupo || ''
-    });
-    // Collect the IDs of all files that were patched
-    const patchedIds = [currentCorrectionFileId, ...(sOther.files||[]).map(f=>f.id)];
-    for (const fileId of patchedIds) {
-      try {
-        const fi = await beApi(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`);
-        for (const parentId of (fi.parents||[])) {
-          // Remove old meta file if exists
-          const qm = `name='${metaNombre.replace(/'/g,"\'")}' and '${parentId}' in parents and trashed=false`;
-          const sm = await beApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)`);
-          for (const mf of (sm.files||[])) await beApi(`https://www.googleapis.com/drive/v3/files/${mf.id}`, {method:'DELETE'});
-          // Upload new meta
-          const mf2 = new FormData();
-          mf2.append('metadata', new Blob([JSON.stringify({name:metaNombre,parents:[parentId],mimeType:'application/json'})],{type:'application/json'}));
-          mf2.append('file', new Blob([metaContent],{type:'application/json'}));
-          const metaUploadResult = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
-            method:'POST', headers:{Authorization:`Bearer ${beGAccessToken}`}, body:mf2
-          });
-          const metaUploadJson = await metaUploadResult.json();
-          console.log('[Backend] Sidecar creado:', metaNombre, 'ID:', metaUploadJson.id || 'ERROR', metaUploadJson.error?.message||'');
-        }
-      } catch(e) { console.error('[Backend] Error creando sidecar para', fileId, e); }
-    }
-
+    // _comentariosGenerales already embedded in PDF Subject metadata — no sidecar needed
     showToastBe(`✓ "${nuevoNombre}" — actualizado en ${patched} ubicación(es)`);
     volverExplorer();
   } catch(e) {
