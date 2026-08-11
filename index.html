@@ -1645,17 +1645,34 @@ async function deleteSyncFiles(uploadedFolderNames) {
     } catch(e) {}
   }
   // PATCH all "(con comentarios)" versions back to original name + final content
-  // Delete the (con comentarios) file via Vercel (uses moadon credentials — always has permission)
+  // Delete the (con comentarios) file
+  // Strategy: try madrijim's own token first (they own the original file),
+  // then fall back to Vercel (moadon credentials) if that fails.
   const corrFileId = window._correctionDriveFileId;
   if (corrFileId) {
     try {
-      // Delete main PDF
-      await fetch('/api/delete-file', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId: corrFileId })
-      });
-      // Also search and delete sidecar _meta.json by name
+      let deleted = false;
+
+      // 1. Try DELETE with madrijim's token (they uploaded the original → they own it)
+      if (gAccessToken) {
+        const dr = await fetch(`https://www.googleapis.com/drive/v3/files/${corrFileId}`, {
+          method: 'DELETE', headers: { Authorization: `Bearer ${gAccessToken}` }
+        });
+        deleted = dr.status === 204;
+      }
+
+      // 2. Fallback: Vercel endpoint (moadon credentials)
+      if (!deleted) {
+        const vr = await fetch('/api/delete-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: corrFileId })
+        });
+        const vd = await vr.json();
+        deleted = vd.success;
+      }
+
+      // 3. Also delete sidecar _meta.json via Vercel (always moadon-owned)
       const baseName = window._correctionBaseName || pendingName || '';
       if (baseName && gAccessToken) {
         try {
@@ -1664,8 +1681,7 @@ async function deleteSyncFiles(uploadedFolderNames) {
           const sm = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)&pageSize=5`);
           for (const mf of (sm.files||[])) {
             await fetch('/api/delete-file', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ fileId: mf.id })
             });
           }
