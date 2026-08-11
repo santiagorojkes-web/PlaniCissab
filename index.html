@@ -1452,8 +1452,14 @@ async function ensureActivityFolders(){ return loadDriveFolders(); }
 async function subirPracticasADrive() {
   try {
     showToast('⏳ Subiendo planificación de prácticas...');
-    const grupo = window._practicasGrupo || selectedGrupos[0] || 'General';
+    const grupo   = window._practicasGrupo   || selectedGrupos[0] || 'General';
     const subArea = window._practicasSubArea || 'Bogrim Mayor';
+    // Si viene de "Corregir plani", el nombre lleva " corregida"
+    const isCorreccion = !!window._correctionDriveFileId;
+    const corrFileId   = window._correctionDriveFileId;
+    const uploadFileName = isCorreccion
+      ? (window._correctionBaseName || pendingName || 'Planificación') + ' corregida.pdf'
+      : (pendingName || 'Planificación') + '.pdf';
     // Convertir el blob a base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1465,17 +1471,26 @@ async function subirPracticasADrive() {
     const r = await fetch('/api/upload-practicas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: (pendingName || 'Planificación') + '.pdf',
-        fileBase64: base64,
-        subArea,
-        grupo
-      })
+      body: JSON.stringify({ fileName: uploadFileName, fileBase64: base64, subArea, grupo })
     });
     const d = await r.json();
-    if (d.success) showToast(`✓ Práctica "${pendingName}" subida a Drive`);
-    else {
-      const detail = d.googleError ? ` (${d.googleError}: ${d.googleErrorDesc||''})` : 
+    if (d.success) {
+      showToast(`✓ "${uploadFileName.replace('.pdf','')}" subida a Drive`);
+      // Si era una corrección, eliminar el archivo "(con comentarios)" via Vercel
+      if (isCorreccion && corrFileId) {
+        try {
+          await fetch('/api/delete-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: corrFileId })
+          });
+          window._correctionDriveFileId   = null;
+          window._correctionDriveFileName = null;
+          window._correctionBaseName      = null;
+        } catch(e) { /* non-critical */ }
+      }
+    } else {
+      const detail = d.googleError ? ` (${d.googleError}: ${d.googleErrorDesc||''})` :
                      d.debug ? ` — vars: clientId=${d.debug.hasClientId} secret=${d.debug.hasClientSecret} token=${d.debug.hasRefreshToken}` : '';
       throw new Error((d.error || 'Error al subir') + detail);
     }
@@ -1494,7 +1509,11 @@ async function ejecutarSubida(){
       return;
     }
     await ensureActivityFolders();
-    pendingName = getNombreArchivo() || 'Planificación';
+    const baseName = getNombreArchivo() || 'Planificación';
+    // If coming from "Corregir plani", upload as "corregida" and clean up (con comentarios)
+    pendingName = window._correctionDriveFileId
+      ? (window._correctionBaseName || baseName) + ' corregida'
+      : baseName;
     pendingBlob=await generarPdfBlob();
     abrirDriveFolderModal();
   }catch(e){showToast('Error: '+e.message);}
@@ -1626,55 +1645,36 @@ async function deleteSyncFiles(uploadedFolderNames) {
     } catch(e) {}
   }
   // PATCH all "(con comentarios)" versions back to original name + final content
-  // Delete or rename the (con comentarios) files
-  // Prefer the exact stored base name (avoids filename reconstruction errors)
-  const baseName = window._correctionBaseName || pendingName || '';
-  if (baseName && gAccessToken) {
+  // Delete the (con comentarios) file via Vercel (uses moadon credentials — always has permission)
+  const corrFileId = window._correctionDriveFileId;
+  if (corrFileId) {
     try {
-      const comentName = baseName + ' (con comentarios).pdf';
-      const q = `name='${comentName.replace(/'/g,"\'")}' and trashed=false`;
-      const s = await driveApi(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=50`
-      );
-      for (const f of (s.files||[])) {
-        // Try DELETE first (works when madrijim owns the file)
-        const dr = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${f.id}`,
-          { method:'DELETE', headers:{Authorization:`Bearer ${gAccessToken}`} }
-        );
-        if (dr.status !== 204) {
-          // Fallback: metadata-only rename — lighter than content PATCH, works with editor access
-          await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
-            method:'PATCH',
-            headers:{ Authorization:`Bearer ${gAccessToken}`, 'Content-Type':'application/json' },
-            body: JSON.stringify({ name: baseName + ' (reemplazada).pdf' })
-          });
-        }
-        // Also delete/rename the sidecar _meta.json
+      // Delete main PDF
+      await fetch('/api/delete-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId: corrFileId })
+      });
+      // Also search and delete sidecar _meta.json by name
+      const baseName = window._correctionBaseName || pendingName || '';
+      if (baseName && gAccessToken) {
         try {
           const metaName = baseName + ' (con comentarios)_meta.json';
           const qm = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
           const sm = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)&pageSize=5`);
           for (const mf of (sm.files||[])) {
-            // Try DELETE first, then rename if forbidden
-            const dm = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${mf.id}`,
-              { method:'DELETE', headers:{Authorization:`Bearer ${gAccessToken}`} }
-            );
-            if (dm.status !== 204) {
-              // Fallback: rename to mark as processed
-              await fetch(`https://www.googleapis.com/drive/v3/files/${mf.id}`, {
-                method:'PATCH',
-                headers:{ Authorization:`Bearer ${gAccessToken}`, 'Content-Type':'application/json' },
-                body: JSON.stringify({ name: baseName + ' (reemplazada)_meta.json' })
-              });
-            }
+            await fetch('/api/delete-file', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId: mf.id })
+            });
           }
         } catch(e) {}
       }
-      window._correctionDriveFileId = null;
-      window._correctionBaseName = null;
-    } catch(e) { console.error('Error cleaning up comentarios:', e); }
+    } catch(e) { console.error('Error eliminando (con comentarios):', e); }
+    window._correctionDriveFileId   = null;
+    window._correctionDriveFileName = null;
+    window._correctionBaseName      = null;
   }
 }
 
