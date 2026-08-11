@@ -793,6 +793,10 @@ body.practicas-mode #practicasSubAreaField { display:block !important; }
   #headerTag { font-size: 10px; }
 }
 
+
+/* PRÁCTICAS: ocultar tipos de actividad */
+body.practicas-mode #tipoActSection { display: none !important; }
+
 </style>
 </head>
 </head>
@@ -1224,38 +1228,12 @@ function updateHeaderMode() {
   }
 }
 
-// ── Cargar config del sub-área para PRÁCTICAS (via Vercel, sin OAuth) ──
-async function cargarConfigPracticas(subArea) {
-  if (!subArea) return;
-  try {
-    const r = await fetch(`/api/get-config?subArea=${encodeURIComponent(subArea)}`);
-    const d = await r.json();
-    if (d.success && d.config) {
-      applyAreaConfig(d.config);
-      showToast('✓ Configuración de ' + subArea + ' cargada');
-    } else {
-      // No config for this area yet — show empty grupos
-      console.warn('[PlaniCissab] Sin config para', subArea, d.error);
-    }
-  } catch(e) {
-    console.error('[PlaniCissab] Error cargando config:', e);
-  }
-  showModal(); // show start screen after config attempt
-}
 function afterLogin() {
   document.getElementById('loginOverlay').style.display='none';
   updateHeaderMode();
   // PRÁCTICAS: limpiar tipos de actividad por defecto (son de Moadon)
   // Se van a cargar los del sub-área cuando conecte Drive, si los tiene
-  if (window._isPracticas) {
-    TIPOS_ACT = [];
-    TIPOS = [];
-    renderTipoActChips();
-    // Cargar config del sub-área via Vercel (sin OAuth del usuario)
-    cargarConfigPracticas(window._practicasSubArea);
-  } else {
-    loadCachedConfig();
-  }
+  loadCachedConfig(); // loads groups, tipos de momento, etc.
 
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
     if (ALL_GRUPOS.includes(currentUser.grupo)) {
@@ -1358,9 +1336,6 @@ let TIPOS_ACT = ['Actividad Chill','Actividad Deportiva','Actividad Jaguim','Act
 let selectedTipoAct = '';
 
 function renderTipoActChips() {
-  // PRÁCTICAS sin tipos de actividad configurados: ocultar la sección completa
-  const tipoSection = document.getElementById('tipoActSection');
-  if (tipoSection) tipoSection.style.display = (window._isPracticas && TIPOS_ACT.length === 0) ? 'none' : '';
   const c = document.getElementById('tipoActChips'); if(!c) return;
   c.innerHTML = TIPOS_ACT.map(t =>
     `<button class="tipo-act-chip${selectedTipoAct===t?' active':''}" data-tipo="${t}" onclick="selectTipoAct('${t}')">${t}</button>`
