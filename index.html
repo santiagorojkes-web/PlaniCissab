@@ -1223,6 +1223,25 @@ function updateHeaderMode() {
     if (tagEl) tagEl.textContent = '#MiCorazónLateNaranja';
   }
 }
+
+// ── Cargar config del sub-área para PRÁCTICAS (via Vercel, sin OAuth) ──
+async function cargarConfigPracticas(subArea) {
+  if (!subArea) return;
+  try {
+    const r = await fetch(`/api/get-config?subArea=${encodeURIComponent(subArea)}`);
+    const d = await r.json();
+    if (d.success && d.config) {
+      applyAreaConfig(d.config);
+      showToast('✓ Configuración de ' + subArea + ' cargada');
+    } else {
+      // No config for this area yet — show empty grupos
+      console.warn('[PlaniCissab] Sin config para', subArea, d.error);
+    }
+  } catch(e) {
+    console.error('[PlaniCissab] Error cargando config:', e);
+  }
+  showModal(); // show start screen after config attempt
+}
 function afterLogin() {
   document.getElementById('loginOverlay').style.display='none';
   updateHeaderMode();
@@ -1232,8 +1251,11 @@ function afterLogin() {
     TIPOS_ACT = [];
     TIPOS = [];
     renderTipoActChips();
+    // Cargar config del sub-área via Vercel (sin OAuth del usuario)
+    cargarConfigPracticas(window._practicasSubArea);
+  } else {
+    loadCachedConfig();
   }
-  loadCachedConfig();
 
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
     if (ALL_GRUPOS.includes(currentUser.grupo)) {
