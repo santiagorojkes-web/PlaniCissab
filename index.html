@@ -849,6 +849,8 @@ body.practicas-mode #tipoActSection { display: none !important; }
         <option value="Bogrim Menor">Bogrim Menor</option>
         <option value="Shorashim">Shorashim</option>
       </select>
+      <label class="login-label" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;margin-top:10px;display:block;">Grupo</label>
+      <input class="login-input" id="practicasGrupo" placeholder="Nombre del grupo..." style="font-size:16px;" autocomplete="off"/>
     </div>
     <div id="loginCredentials">
     <div class="login-field">
@@ -1133,6 +1135,7 @@ function logout() {
   sessionStorage.removeItem('cissab_cgc');
   window._isPracticas = false;
   window._practicasSubArea = null;
+  window._practicasGrupo = null;
   document.body.classList.remove('practicas-mode');
   window._correctionDriveFileId = null;
   window._correctionDriveFileName = null;
@@ -1166,11 +1169,14 @@ function doLogin() {
   // ── PRÁCTICAS mode: no credentials ──
   if (selArea === 'PRÁCTICAS') {
     const subArea = (document.getElementById('practicasSubArea')||{}).value || '';
+    const grupoInput = ((document.getElementById('practicasGrupo')||{}).value || '').trim();
     if (!subArea) { err.textContent='Seleccioná el sub-área de prácticas.'; return; }
+    if (!grupoInput) { err.textContent='Escribí el nombre del grupo.'; return; }
+    const pracGrupo = grupoInput;
     err.textContent='';
     window._isPracticas = true;
-    console.log('[PlaniCissab] Login PRÁCTICAS OK, _isPracticas=true, subArea=', subArea);
     window._practicasSubArea = subArea;
+    window._practicasGrupo = pracGrupo;
     window._currentArea = subArea; // use sub-area for Drive folder lookups
     currentUser = { email:'practicas', pw:'', grupo:'', area:'PRÁCTICAS', subArea, isPracticas:true, isAdmin:false };
     document.body.classList.add('practicas-mode');
@@ -1249,9 +1255,14 @@ function afterLogin() {
   // PRÁCTICAS: limpiar tipos de actividad por defecto (son de Moadon)
   // Se van a cargar los del sub-área cuando conecte Drive, si los tiene
   loadCachedConfig(); // loads cached config first (fast)
-  // PRÁCTICAS: also fetch sub-area config from server (async, updates groups when ready)
-  if (window._isPracticas && window._practicasSubArea) {
-    cargarConfigPracticas(window._practicasSubArea);
+  if (window._isPracticas) {
+    // Show the selected group in the sheet
+    if (window._practicasGrupo) {
+      selectedGrupos = [window._practicasGrupo];
+      renderGrupoChips();
+    }
+    // Also try to fetch sub-area config (async, for tipos de momento, etc.)
+    if (window._practicasSubArea) cargarConfigPracticas(window._practicasSubArea);
   }
 
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
@@ -1409,7 +1420,7 @@ async function ensureActivityFolders(){ return loadDriveFolders(); }
 async function subirPracticasADrive() {
   try {
     showToast('⏳ Subiendo planificación de prácticas...');
-    const grupo = selectedGrupos[0] || 'General';
+    const grupo = window._practicasGrupo || selectedGrupos[0] || 'General';
     const subArea = window._practicasSubArea || 'Bogrim Mayor';
     // Convertir el blob a base64
     const base64 = await new Promise((resolve, reject) => {
