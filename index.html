@@ -1458,7 +1458,9 @@ async function subirPracticasADrive() {
     const isCorreccion = !!window._correctionDriveFileId;
     const corrFileId   = window._correctionDriveFileId;
     const uploadFileName = isCorreccion
-      ? (window._correctionBaseName || pendingName || 'Planificación') + ' corregida.pdf'
+      ? ((window._correctionBaseName || pendingName || 'Planificación')
+          .replace(/ corregida$/i, '').replace(/ \(con comentarios\)$/i, '')
+        ) + ' corregida.pdf'
       : (pendingName || 'Planificación') + '.pdf';
     // Convertir el blob a base64
     const base64 = await new Promise((resolve, reject) => {
@@ -1510,10 +1512,15 @@ async function ejecutarSubida(){
     }
     await ensureActivityFolders();
     const baseName = getNombreArchivo() || 'Planificación';
-    // If coming from "Corregir plani", upload as "corregida" and clean up (con comentarios)
-    pendingName = window._correctionDriveFileId
-      ? (window._correctionBaseName || baseName) + ' corregida'
-      : baseName;
+    // If coming from "Corregir plani", upload as "corregida" (strip old suffixes to avoid accumulation)
+    if (window._correctionDriveFileId) {
+      const cleanBase = (window._correctionBaseName || baseName)
+        .replace(/ corregida$/i, '')
+        .replace(/ \(con comentarios\)$/i, '');
+      pendingName = cleanBase + ' corregida';
+    } else {
+      pendingName = baseName;
+    }
     pendingBlob=await generarPdfBlob();
     abrirDriveFolderModal();
   }catch(e){showToast('Error: '+e.message);}
@@ -1672,21 +1679,7 @@ async function deleteSyncFiles(uploadedFolderNames) {
         deleted = vd.success;
       }
 
-      // 3. Also delete sidecar _meta.json via Vercel (always moadon-owned)
-      const baseName = window._correctionBaseName || pendingName || '';
-      if (baseName && gAccessToken) {
-        try {
-          const metaName = baseName + ' (con comentarios)_meta.json';
-          const qm = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
-          const sm = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qm)}&fields=files(id)&pageSize=5`);
-          for (const mf of (sm.files||[])) {
-            await fetch('/api/delete-file', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileId: mf.id })
-            });
-          }
-        } catch(e) {}
-      }
+      // No sidecar JSON anymore — comments are in PDF metadata
     } catch(e) { console.error('Error eliminando (con comentarios):', e); }
     window._correctionDriveFileId   = null;
     window._correctionDriveFileName = null;
@@ -3687,29 +3680,7 @@ async function importarPlaniConComentarios(fileId, fileName) {
       .replace(/\.pdf$/i, '')
       .replace(/ \(con comentarios\)/i, '')
       .trim();
-    // Fetch sidecar _meta.json to get coordinator general comments
-    try {
-      const metaName = fileName.replace(/\.pdf$/i, '_meta.json');
-      const qMeta = `name='${metaName.replace(/'/g,"\'")}' and trashed=false`;
-      console.log('[PlaniCissab] Buscando sidecar:', metaName);
-      const sMeta = await driveApi(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qMeta)}&fields=files(id)&pageSize=5`
-      );
-      console.log('[PlaniCissab] Sidecar encontrado:', (sMeta.files||[]).length, 'archivos');
-      if ((sMeta.files||[]).length > 0) {
-        const mr = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${sMeta.files[0].id}?alt=media`,
-          { headers: { Authorization: `Bearer ${gAccessToken}` } }
-        );
-        const mj = await mr.json();
-        console.log('[PlaniCissab] Sidecar contenido:', JSON.stringify(mj).substring(0,200));
-        if (mj._comentariosGenerales && mj._comentariosGenerales.length > 0) {
-          window._comentariosGenerales = mj._comentariosGenerales;
-          sessionStorage.setItem('cissab_cgc', JSON.stringify(window._comentariosGenerales));
-          console.log('[PlaniCissab] Comentarios generales cargados:', mj._comentariosGenerales);
-        }
-      }
-    } catch(e) { console.error('[PlaniCissab] Error leyendo sidecar:', e); }
+    // General comments come from PDF Subject metadata (read in handlePdfFile)
     cerrarCorregirModal();
     closeModal();
     requestAnimationFrame(() => { renderAll(); renderTeam(); });
