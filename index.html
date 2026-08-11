@@ -843,14 +843,16 @@ body.practicas-mode #tipoActSection { display: none !important; }
     </div>
     <div id="practicasSubAreaField" style="display:none;margin-top:10px;">
       <label class="login-label" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;">Sub-área</label>
-      <select class="login-input" id="practicasSubArea" style="cursor:pointer;">
+      <select class="login-input" id="practicasSubArea" style="cursor:pointer;" onchange="actualizarGruposPracticas(this.value)">
         <option value="">Seleccioná sub-área...</option>
         <option value="Bogrim Mayor">Bogrim Mayor</option>
         <option value="Bogrim Menor">Bogrim Menor</option>
         <option value="Shorashim">Shorashim</option>
       </select>
       <label class="login-label" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;margin-top:10px;display:block;">Grupo</label>
-      <input class="login-input" id="practicasGrupo" placeholder="Nombre del grupo..." style="font-size:16px;" autocomplete="off"/>
+      <select class="login-input" id="practicasGrupo" style="cursor:pointer;">
+        <option value="">Seleccioná un grupo...</option>
+      </select>
     </div>
     <div id="loginCredentials">
     <div class="login-field">
@@ -1150,6 +1152,17 @@ function logout() {
   document.getElementById('loginEmail').value='';
   document.getElementById('loginPass').value='';
   document.getElementById('loginError').textContent='';
+}
+
+// ── Grupos por sub-área para PRÁCTICAS ──
+const PRACTICAS_GRUPOS = {"Bogrim Mayor": ["MEGALIM", "JALUTZIM", "MEKORIM", "SHELANU", "SHILUVIM", "NETZAJ", "GUIBORIM", "KISHURIM", "JASHUBIM"], "Bogrim Menor": ["KESHARIM", "OTAZAR", "SHAIAJUT", "ALUFIM", "JOLMIM", "NESHARIM", "IEDIDIM NARANJA", "IEDIDIM AZUL"], "Shorashim": ["COJABIM AZUL", "COJABIM BLANCO", "COJABIM NARANJA", "ANANIM NARANJA", "ANANIM BLANCO", "REGUESH", "IEJIDIM", "GUESHARIM"]};
+
+function actualizarGruposPracticas(subArea) {
+  const sel = document.getElementById('practicasGrupo');
+  if (!sel) return;
+  const grupos = PRACTICAS_GRUPOS[subArea] || [];
+  sel.innerHTML = '<option value="">Seleccioná un grupo...</option>' +
+    grupos.map(g => `<option value="${g}">${g}</option>`).join('');
 }
 function onLoginAreaChange(val) {
   const isPrac = val === 'PRÁCTICAS';
