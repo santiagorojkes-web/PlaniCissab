@@ -1228,12 +1228,31 @@ function updateHeaderMode() {
   }
 }
 
+
+// ── Config del sub-área para PRÁCTICAS via Vercel (sin OAuth del usuario) ──
+async function cargarConfigPracticas(subArea) {
+  if (!subArea) return;
+  try {
+    const r = await fetch('/api/get-config?subArea=' + encodeURIComponent(subArea));
+    const d = await r.json();
+    if (d.success && d.config) {
+      applyAreaConfig(d.config);
+    }
+    // Si no hay config, los grupos del cache o default se usan igual
+  } catch(e) {
+    console.warn('[PRÁCTICAS] Sin config para', subArea, e.message);
+  }
+}
 function afterLogin() {
   document.getElementById('loginOverlay').style.display='none';
   updateHeaderMode();
   // PRÁCTICAS: limpiar tipos de actividad por defecto (son de Moadon)
   // Se van a cargar los del sub-área cuando conecte Drive, si los tiene
-  loadCachedConfig(); // loads groups, tipos de momento, etc.
+  loadCachedConfig(); // loads cached config first (fast)
+  // PRÁCTICAS: also fetch sub-area config from server (async, updates groups when ready)
+  if (window._isPracticas && window._practicasSubArea) {
+    cargarConfigPracticas(window._practicasSubArea);
+  }
 
   if (currentUser&&currentUser.grupo&&!currentUser.isAdmin) {
     if (ALL_GRUPOS.includes(currentUser.grupo)) {
