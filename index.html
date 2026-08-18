@@ -1180,26 +1180,41 @@ function onLoginAreaChange(val) {
 
 let _preloadPromise = null;
 
-// Fetches the area config from Vercel to populate login credentials
+// Loads area credentials: first from localStorage cache (fast, works offline),
+// then from Vercel as fallback (requires valid refresh token)
 async function preloadAreaCredentials(area) {
   _preloadPromise = (async () => {
+    // 1. Try localStorage cache first (this is what worked before PRÁCTICAS)
+    const cached = localStorage.getItem('cissab_area_config_' + area);
+    if (cached) {
+      try {
+        const cfg = JSON.parse(cached);
+        if (cfg && cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
+          const existing = USERS.filter(u => u.area !== area);
+          const newUsers = Object.entries(cfg.usuarios).map(([grupo, u]) => ({
+            email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
+          })).filter(u => u.email && u.pw);
+          USERS.length = 0;
+          [...existing, ...newUsers].forEach(u => USERS.push(u));
+          return; // found in cache, no need for Vercel
+        }
+      } catch(e) {}
+    }
+    // 2. Fallback: fetch from Vercel (used when no cache exists)
     try {
-      console.log('[Login] Cargando credenciales para área:', area);
       const r = await fetch('/api/get-config?subArea=' + encodeURIComponent(area));
       const d = await r.json();
-      console.log('[Login] Respuesta get-config:', JSON.stringify(d).substring(0, 300));
       if (d.success && d.config && d.config.usuarios) {
         const existing = USERS.filter(u => u.area !== area);
         const newUsers = Object.entries(d.config.usuarios).map(([grupo, u]) => ({
           email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
         })).filter(u => u.email && u.pw);
-        console.log('[Login] Usuarios cargados para', area, ':', newUsers.map(u => u.email));
         USERS.length = 0;
         [...existing, ...newUsers].forEach(u => USERS.push(u));
-      } else {
-        console.warn('[Login] Sin usuarios en config:', d.error || 'config sin usuarios');
+        // Cache for next time
+        if (d.config) localStorage.setItem('cissab_area_config_' + area, JSON.stringify(d.config));
       }
-    } catch(e) { console.error('[Login] Error cargando credenciales:', e); }
+    } catch(e) { /* Vercel unavailable, no credentials loaded */ }
   })();
   return _preloadPromise;
 }
