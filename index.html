@@ -1184,17 +1184,22 @@ let _preloadPromise = null;
 async function preloadAreaCredentials(area) {
   _preloadPromise = (async () => {
     try {
+      console.log('[Login] Cargando credenciales para área:', area);
       const r = await fetch('/api/get-config?subArea=' + encodeURIComponent(area));
       const d = await r.json();
+      console.log('[Login] Respuesta get-config:', JSON.stringify(d).substring(0, 300));
       if (d.success && d.config && d.config.usuarios) {
         const existing = USERS.filter(u => u.area !== area);
         const newUsers = Object.entries(d.config.usuarios).map(([grupo, u]) => ({
           email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
         })).filter(u => u.email && u.pw);
+        console.log('[Login] Usuarios cargados para', area, ':', newUsers.map(u => u.email));
         USERS.length = 0;
         [...existing, ...newUsers].forEach(u => USERS.push(u));
+      } else {
+        console.warn('[Login] Sin usuarios en config:', d.error || 'config sin usuarios');
       }
-    } catch(e) {}
+    } catch(e) { console.error('[Login] Error cargando credenciales:', e); }
   })();
   return _preloadPromise;
 }
