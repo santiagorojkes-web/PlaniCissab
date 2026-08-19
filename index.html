@@ -1605,7 +1605,16 @@ function abrirDriveFolderModal(){
   const actFolder=ACTIVITY_FOLDER_MAP[tipoAct]||'';
   const pre=new Set();
   selectedGrupos.forEach(g=>{if(g!=='General')pre.add(g.toLowerCase());});
-  if(selectedGrupos[0]==='General') pre.add('actividades generales');
+  if(selectedGrupos[0]==='General') {
+    pre.add('actividades generales');
+    // Ensure Actividades Generales folder exists
+    if (!driveRootFolders['actividades generales'] && gAccessToken && carpetaAreaId) {
+      driveApi('https://www.googleapis.com/drive/v3/files', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name:'Actividades Generales', mimeType:'application/vnd.google-apps.folder', parents:[carpetaAreaId]})
+      }).then(r => { if(r.id) { driveRootFolders['actividades generales']=r.id; abrirDriveFolderModal(); }}).catch(()=>{});
+    }
+  }
   if(actFolder) pre.add(actFolder.toLowerCase());
   const allNames=Object.keys(driveRootFolders);
   // Always show ALL groups (folder created on upload if needed)
@@ -3489,9 +3498,12 @@ function applyAreaConfig(cfg) {
     TIPOS_ACT = cfg.tiposActividad.map(a => a.nombre);
     if (!TIPOS_ACT.includes(selectedTipoAct)) selectedTipoAct = '';
     renderTipoActChips();
-    // Update ACTIVITY_FOLDER_MAP
+    // Update ACTIVITY_FOLDER_MAP and ACTIVITY_FOLDERS from config
     cfg.tiposActividad.forEach(a => {
-      if (a.carpeta) ACTIVITY_FOLDER_MAP[a.nombre] = a.carpeta;
+      if (a.nombre && a.carpeta) {
+        ACTIVITY_FOLDER_MAP[a.nombre] = a.carpeta;
+        if (!ACTIVITY_FOLDERS.includes(a.carpeta)) ACTIVITY_FOLDERS.push(a.carpeta);
+      }
     });
   }
 
