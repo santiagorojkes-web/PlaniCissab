@@ -797,6 +797,135 @@ body.practicas-mode #practicasSubAreaField { display:block !important; }
 /* PRÁCTICAS: ocultar tipos de actividad */
 body.practicas-mode #tipoActSection { display: none !important; }
 
+
+/* ════════════════════════════════════════════
+   MOBILE COMPREHENSIVE — PlaniCissab index
+   ════════════════════════════════════════════ */
+
+/* Safe area insets for iPhone notch / home bar */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-bar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .fab-add-momento { bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 768px) {
+
+  /* ── Global ── */
+  * { -webkit-tap-highlight-color: transparent; }
+  body { -webkit-overflow-scrolling: touch; }
+
+  /* ── ALL inputs must be ≥16px to prevent iOS auto-zoom ── */
+  input, textarea, select {
+    font-size: 16px !important;
+    -webkit-appearance: none;
+  }
+
+  /* ── Login ── */
+  .login-overlay { padding: 0; align-items: flex-start; }
+  .login-box {
+    width: 100%; min-height: 100dvh;
+    border-radius: 0; padding: 40px 24px 32px;
+    display: flex; flex-direction: column;
+    box-shadow: none;
+  }
+  .login-logo { font-size: 22px; margin-bottom: 4px; }
+  .login-sub  { font-size: 14px; margin-bottom: 28px; }
+  .login-field { margin-bottom: 14px; }
+  .login-input { min-height: 50px; font-size: 16px !important; padding: 12px 14px; }
+  .login-btn   { min-height: 52px; font-size: 16px; margin-top: 8px; }
+  .login-label { font-size: 10px; letter-spacing: .07em; }
+  #loginDriveConnect button { min-height: 50px; font-size: 15px; }
+
+  /* ── Header ── */
+  .page-header { padding: 12px 16px; }
+  #headerTitle { font-size: 14px; }
+  #headerTag   { font-size: 10px; }
+
+  /* ── Shift toggle ── */
+  .shift-wrap { padding: 8px 16px; }
+  .shift-btn  { min-height: 36px; font-size: 12px; padding: 6px 12px; }
+
+  /* ── Info card ── */
+  .info-grid { grid-template-columns: 1fr; }
+  .info-cell { border-right: none !important; border-bottom: 1px solid var(--border) !important; }
+  .info-cell.full { grid-column: span 1; }
+  #tipoActSection { grid-column: span 1; }
+  .field-input { min-height: 44px; border-radius: 8px; }
+
+  /* ── Tipo chips ── */
+  .tipo-act-chips { gap: 6px; flex-wrap: wrap; }
+  .tipo-act-chip  { min-height: 36px; font-size: 12px; padding: 6px 12px; }
+
+  /* ── Grupo chips ── */
+  .grupo-chip-btn { min-height: 36px; font-size: 12px; }
+
+  /* ── Team card ── */
+  .team-chip     { min-height: 32px; font-size: 13px; }
+  .team-add-btn  { min-height: 36px; }
+  .add-madrij-btn { min-height: 40px; font-size: 14px; }
+
+  /* ── Momentos como cards ── */
+  .momento.col-grid { margin: 8px 12px; border-radius: 12px; }
+  .m-mobile-header  { padding: 10px 12px; }
+  .mcell { padding: 10px 12px; }
+  .cell-ta { min-height: 60px; }
+
+  /* ── Material / rol chips ── */
+  .mat-chip, .rol-chip { font-size: 12px; }
+  .mat-add-input, .rol-add-input { font-size: 16px !important; min-height: 40px; }
+  .mat-add-btn, .rol-add-btn { min-height: 40px; }
+
+  /* ── Comentarios del coordinador ── */
+  .coord-comment-done { width: 32px; height: 32px; }
+  #coordGeneralComments { margin: 0 0 0; border-radius: 0; }
+
+  /* ── Bottom bar ── */
+  .bottom-bar {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .bottom-bar .btn {
+    flex: 1;
+    min-height: 44px;
+    font-size: 11px;
+    padding: 6px 6px;
+    justify-content: center;
+    gap: 3px;
+  }
+  /* Hide less important buttons on very small screens */
+  @media (max-width: 390px) {
+    #btnSave svg, #btnDrive svg { display: none; }
+  }
+
+  /* ── FAB ── */
+  .fab-add-momento { width: 60px; height: 60px; font-size: 30px; right: 16px; bottom: 80px; }
+
+  /* ── Drive folder modal ── */
+  #driveFolderModal > div { max-height: 90dvh; border-radius: 16px 16px 0 0; }
+  .dfm-item { min-height: 48px; padding: 12px 16px; }
+
+  /* ── Corregir modal ── */
+  #corregirModal > div  { max-height: 90dvh; border-radius: 16px 16px 0 0; }
+
+  /* ── Import modal ── */
+  #importOverlay > div { max-height: 90dvh; border-radius: 16px 16px 0 0; }
+
+  /* ── Drive config prompt ── */
+  #driveConfigPrompt > div { border-radius: 16px; margin: 16px; }
+
+  /* ── Start modal ── */
+  #startModal { border-radius: 16px 16px 0 0; bottom: 0; top: auto; max-height: 85dvh; }
+  .option-btn { min-height: 60px; font-size: 15px; }
+
+  /* ── Jaguim input ── */
+  .jag-input { font-size: 16px !important; min-height: 44px; }
+}
+
+/* Small phones */
+@media (max-width: 390px) {
+  .bottom-bar .btn span { display: none; }
+}
+
 </style>
 </head>
 </head>
