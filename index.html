@@ -1467,13 +1467,27 @@ function getNombreArchivo(){
 // ══════════════════════════════════════════════════════
 
 let TIPOS_ACT = []; // populated from area config via Drive
+let TIPOS_ACT_COLORS = {
+  'Actividad Chill':      '#3b82f6',
+  'Actividad Deportiva':  '#22c55e',
+  'Actividad General':    '#e8630a',
+  'Actividad Jaguim':     '#8b5cf6',
+  'Actividad Picante':    '#ef4444',
+  'Actividad de Terror':  '#1f2937'
+}; // populated from config colors
 let selectedTipoAct = '';
 
 function renderTipoActChips() {
   const c = document.getElementById('tipoActChips'); if(!c) return;
-  c.innerHTML = TIPOS_ACT.map(t =>
-    `<button class="tipo-act-chip${selectedTipoAct===t?' active':''}" data-tipo="${t}" onclick="selectTipoAct('${t}')">${t}</button>`
-  ).join('');
+  c.innerHTML = TIPOS_ACT.map(t => {
+    const color  = TIPOS_ACT_COLORS[t] || 'var(--accent)';
+    const active = selectedTipoAct === t;
+    const style  = active
+      ? `background:${color};border-color:${color};color:#fff;`
+      : '';
+    return `<button class="tipo-act-chip${active?' active':''}" data-tipo="${t}"
+      style="${style}" onclick="selectTipoAct('${t}')">${t}</button>`;
+  }).join('');
 }
 
 function selectTipoAct(t) {
@@ -3498,12 +3512,13 @@ function applyAreaConfig(cfg) {
     TIPOS_ACT = cfg.tiposActividad.map(a => a.nombre);
     if (!TIPOS_ACT.includes(selectedTipoAct)) selectedTipoAct = '';
     renderTipoActChips();
-    // Update ACTIVITY_FOLDER_MAP and ACTIVITY_FOLDERS from config
+    // Update ACTIVITY_FOLDER_MAP, ACTIVITY_FOLDERS, and TIPOS_ACT_COLORS from config
     cfg.tiposActividad.forEach(a => {
       if (a.nombre && a.carpeta) {
         ACTIVITY_FOLDER_MAP[a.nombre] = a.carpeta;
         if (!ACTIVITY_FOLDERS.includes(a.carpeta)) ACTIVITY_FOLDERS.push(a.carpeta);
       }
+      if (a.nombre && a.color) TIPOS_ACT_COLORS[a.nombre] = a.color;
     });
   }
 
