@@ -292,6 +292,82 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
   .page-sub { font-size: 12px; }
 }
 
+
+/* ════════════════════════════════════════════
+   MOBILE COMPREHENSIVE — PlaniCissab backend
+   ════════════════════════════════════════════ */
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  @media (max-width: 768px) {
+    .sidebar { padding-bottom: env(safe-area-inset-bottom); }
+    .mobile-top-bar { padding-top: env(safe-area-inset-top); }
+    .save-bar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  }
+}
+
+@media (max-width: 768px) {
+
+  /* ── Global ── */
+  * { -webkit-tap-highlight-color: transparent; }
+  input, textarea, select { font-size: 16px !important; -webkit-appearance: none; }
+
+  /* ── Top bar ── */
+  .mobile-top-bar { height: 56px; }
+  .mobile-top-bar-title { font-size: 14px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-save-btn { min-height: 36px; font-size: 13px; }
+
+  /* ── Main content ── */
+  .main { padding: 16px 14px 100px; }
+  .page-title { font-size: 20px; }
+  .page-sub   { font-size: 12px; }
+
+  /* ── Cards ── */
+  .card { padding: 16px !important; border-radius: 12px; margin-bottom: 12px; }
+  .card-title { font-size: 15px; }
+
+  /* ── All inputs ── */
+  .field-input, .field-select, .login-input {
+    min-height: 48px; font-size: 16px !important;
+    border-radius: 10px;
+  }
+  .tag-add-input { font-size: 16px !important; min-height: 44px; }
+  .login-btn { min-height: 52px; font-size: 16px; }
+
+  /* ── Grupos ── */
+  .grupo-header { min-height: 52px; padding: 14px 16px; }
+  .grupo-tag-chip { min-height: 32px; font-size: 12px; }
+
+  /* ── Actividades ── */
+  .actividad-row { flex-wrap: wrap; gap: 10px; }
+  .color-dot { width: 36px; height: 36px; flex-shrink: 0; }
+
+  /* ── Turnos ── */
+  .turno-row { flex-direction: column; gap: 8px; }
+
+  /* ── Correction view ── */
+  .correction-momento-header { flex-wrap: wrap; gap: 6px; padding: 12px; }
+  .add-comment-input { font-size: 16px !important; min-height: 44px; }
+  .add-comment-btn   { min-height: 44px; }
+  .correction-field-val { font-size: 14px; }
+
+  /* ── Explorer ── */
+  .explorer-item { min-height: 52px; padding: 14px 16px; }
+  .explorer-item-name { font-size: 14px; }
+
+  /* ── Save bar ── */
+  .save-bar { padding: 10px 16px; }
+  #saveConfigBtn, #saveCommentBtn { min-height: 48px; font-size: 15px; }
+
+  /* ── Login ── */
+  .login-box {
+    width: 100%; min-height: 100dvh; border-radius: 0;
+    padding: 48px 24px 32px;
+    display: flex; flex-direction: column; box-shadow: none;
+  }
+  .login-logo { font-size: 22px; }
+  .login-sub  { font-size: 13px; margin-bottom: 28px; }
+}
+
 </style>
 </head>
 <body>
