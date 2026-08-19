@@ -1207,38 +1207,43 @@ async function finalizarLoginDriveConfig() {
   }
 }
 function onLoginAreaChange(val) {
-  const isPrac  = val === 'PRÁCTICAS';
-  const isArea  = !isPrac && !!val; // ALL areas (Moadon included) use Drive connect
+  const isPrac = val === 'PRÁCTICAS';
+  const isArea = !isPrac && !!val;
 
-  const subFld   = document.getElementById('practicasSubAreaField');
-  const driveBtn = document.getElementById('loginDriveConnect');
-  const creds    = document.getElementById('loginCredentials');
-  const status   = document.getElementById('loginDriveStatus');
+  const subFld = document.getElementById('practicasSubAreaField');
+  const creds  = document.getElementById('loginCredentials');
+  const status = document.getElementById('loginDriveStatus');
+  const btn    = document.getElementById('loginDriveConnect');
 
-  if (subFld)   subFld.style.display   = isPrac  ? 'block' : 'none';
-  if (driveBtn) driveBtn.style.display = isArea  ? 'block' : 'none';
-  if (creds)    creds.style.display    = 'none'; // always hidden until Drive connects
-  if (status)   status.textContent     = '';
+  if (subFld) subFld.style.display = isPrac ? 'block' : 'none';
+  if (btn)    btn.style.display    = 'none'; // button hidden — auto-trigger instead
+  if (creds)  creds.style.display  = 'none';
+  if (status) status.textContent   = '';
 
   window._currentArea = isPrac ? '' : val;
   window._loginAreaConnected = false;
 
-  // Fast path: if cache exists for this area, show credentials immediately
-  if (isArea) {
-    const cached = localStorage.getItem('cissab_area_config_' + val);
-    if (cached) {
-      try {
-        const cfg = JSON.parse(cached);
-        if (cfg && cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
-          aplicarCredencialesArea(cfg.usuarios, val);
-          if (driveBtn) driveBtn.style.display = 'none';
-          if (creds)    creds.style.display    = '';
-          if (status)   status.textContent     = '✓ Configuración cargada';
-          window._loginAreaConnected = true;
-        }
-      } catch(e) {}
-    }
+  if (!isArea) return;
+
+  // Fast path: cache exists → show credentials immediately, no Google needed
+  const cached = localStorage.getItem('cissab_area_config_' + val);
+  if (cached) {
+    try {
+      const cfg = JSON.parse(cached);
+      if (cfg && cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
+        aplicarCredencialesArea(cfg.usuarios, val);
+        if (creds)  creds.style.display  = '';
+        if (status) status.textContent   = '✓ Configuración cargada';
+        window._loginAreaConnected = true;
+        return;
+      }
+    } catch(e) {}
   }
+
+  // No cache → auto-trigger Google OAuth (select is a user gesture, so popup is allowed)
+  if (status) status.textContent = '⏳ Conectando con Google...';
+  if (btn)    btn.style.display  = 'block'; // show button as fallback if popup blocked
+  conectarDriveParaLogin();
 }
 
 function aplicarCredencialesArea(usuarios, area) {
@@ -1257,14 +1262,13 @@ async function doLogin() {
   const err   = document.getElementById('loginError');
   const selArea = (document.getElementById('loginArea')||{}).value || '';
   if (!selArea) { err.textContent='Seleccioná un área antes de entrar.'; return; }
-  // Wait for credential preload to finish (in case user clicks Enter before fetch completes)
-  if (_preloadPromise && selArea !== 'PRÁCTICAS' && selArea !== 'Moadon') {
-    const btn = document.querySelector('.login-btn');
-    const origText = btn ? btn.textContent : '';
-    if (btn) { btn.textContent = '⏳ Cargando...'; btn.disabled = true; }
-    try { await _preloadPromise; } catch(e) {}
-    if (btn) { btn.textContent = origText; btn.disabled = false; }
-    _preloadPromise = null;
+  // For non-PRÁCTICAS areas: credentials must be loaded (Drive connected)
+  if (selArea !== 'PRÁCTICAS') {
+    const creds = document.getElementById('loginCredentials');
+    if (creds && creds.style.display === 'none') {
+      err.textContent = 'Primero conectá con Google para cargar la configuración del área.';
+      return;
+    }
   }
   // ── PRÁCTICAS mode: no credentials ──
   if (selArea === 'PRÁCTICAS') {
