@@ -49,7 +49,10 @@ module.exports = async function handler(req, res) {
     });
     const uploadData = await uploadRes.json();
     if (uploadData.id) return res.status(200).json({ success: true, fileId: uploadData.id, fileName });
-    return res.status(500).json({ error: 'Error al subir a Drive', details: uploadData });
+    return res.status(500).json({ 
+      error: 'Error al subir a Drive', 
+      driveError: uploadData.error?.message || JSON.stringify(uploadData).substring(0,200)
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
