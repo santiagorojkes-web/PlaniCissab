@@ -854,7 +854,17 @@ body.practicas-mode #tipoActSection { display: none !important; }
         <option value="">Seleccioná un grupo...</option>
       </select>
     </div>
-    <div id="loginCredentials">
+    <!-- Google connect button for non-Moadon areas -->
+    <div id="loginDriveConnect" style="display:none;margin-top:12px;">
+      <button type="button" onclick="conectarDriveParaLogin()"
+        style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border:2px solid #e8630a;border-radius:10px;background:#fff;color:#e8630a;font-weight:700;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#0066da"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" transform="scale(.5)"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" transform="scale(.5)"/></svg>
+        Conectar con Google para continuar
+      </button>
+      <div id="loginDriveStatus" style="text-align:center;font-size:12px;color:#999;margin-top:6px;"></div>
+    </div>
+
+    <div id="loginCredentials" style="display:none;">
     <div class="login-field">
       <label>Mail</label>
       <input class="login-input" type="email" id="loginEmail" placeholder="mail@grupo.com" autocomplete="email"/>
@@ -1164,60 +1174,82 @@ function actualizarGruposPracticas(subArea) {
   sel.innerHTML = '<option value="">Seleccioná un grupo...</option>' +
     grupos.map(g => `<option value="${g}">${g}</option>`).join('');
 }
-function onLoginAreaChange(val) {
-  const isPrac = val === 'PRÁCTICAS';
-  const creds = document.getElementById('loginCredentials');
-  const subFld = document.getElementById('practicasSubAreaField');
-  if (creds) creds.style.display = isPrac ? 'none' : '';
-  if (subFld) subFld.style.display = isPrac ? 'block' : 'none';
-  window._currentArea = isPrac ? '' : val;
-  // Pre-load area credentials from Drive so non-Moadon users can log in
-  if (!isPrac && val && val !== 'Moadon') {
-    _preloadPromise = null;
-    preloadAreaCredentials(val);
-  }
+
+// ── Conectar Drive en el login para áreas no-Moadon ──
+function conectarDriveParaLogin() {
+  const status = document.getElementById('loginDriveStatus');
+  const area   = (document.getElementById('loginArea')||{}).value || '';
+  if (!area || area === 'Moadon' || area === 'PRÁCTICAS') return;
+  if (status) status.textContent = '⏳ Conectando con Google...';
+  window._currentArea = area;
+  window._pendingLoginConfig = true; // flag: after auth, load config for login
+  iniciarGoogleAuth();
 }
 
-let _preloadPromise = null;
+// Called after OAuth succeeds when _pendingLoginConfig is set
+async function finalizarLoginDriveConfig() {
+  window._pendingLoginConfig = false;
+  const area   = window._currentArea || '';
+  const status = document.getElementById('loginDriveStatus');
+  const creds  = document.getElementById('loginCredentials');
+  const btn    = document.getElementById('loginDriveConnect');
+  if (!area) return;
+  try {
+    if (status) status.textContent = '⏳ Descargando configuración...';
+    await loadConfigFromDrive(); // downloads _config.json and updates USERS + localStorage
+    if (status) status.textContent = '✓ Conectado — ingresá tu mail y contraseña';
+    if (btn)    btn.style.display = 'none';
+    if (creds)  creds.style.display = '';
+    window._loginAreaConnected = true;
+    document.getElementById('loginEmail')?.focus();
+  } catch(e) {
+    if (status) status.textContent = '✗ Error al cargar configuración: ' + e.message;
+  }
+}
+function onLoginAreaChange(val) {
+  const isPrac  = val === 'PRÁCTICAS';
+  const isArea  = !isPrac && !!val; // ALL areas (Moadon included) use Drive connect
 
-// Loads area credentials: first from localStorage cache (fast, works offline),
-// then from Vercel as fallback (requires valid refresh token)
-async function preloadAreaCredentials(area) {
-  _preloadPromise = (async () => {
-    // 1. Try localStorage cache first (this is what worked before PRÁCTICAS)
-    const cached = localStorage.getItem('cissab_area_config_' + area);
+  const subFld   = document.getElementById('practicasSubAreaField');
+  const driveBtn = document.getElementById('loginDriveConnect');
+  const creds    = document.getElementById('loginCredentials');
+  const status   = document.getElementById('loginDriveStatus');
+
+  if (subFld)   subFld.style.display   = isPrac  ? 'block' : 'none';
+  if (driveBtn) driveBtn.style.display = isArea  ? 'block' : 'none';
+  if (creds)    creds.style.display    = 'none'; // always hidden until Drive connects
+  if (status)   status.textContent     = '';
+
+  window._currentArea = isPrac ? '' : val;
+  window._loginAreaConnected = false;
+
+  // Fast path: if cache exists for this area, show credentials immediately
+  if (isArea) {
+    const cached = localStorage.getItem('cissab_area_config_' + val);
     if (cached) {
       try {
         const cfg = JSON.parse(cached);
         if (cfg && cfg.usuarios && Object.keys(cfg.usuarios).length > 0) {
-          const existing = USERS.filter(u => u.area !== area);
-          const newUsers = Object.entries(cfg.usuarios).map(([grupo, u]) => ({
-            email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
-          })).filter(u => u.email && u.pw);
-          USERS.length = 0;
-          [...existing, ...newUsers].forEach(u => USERS.push(u));
-          return; // found in cache, no need for Vercel
+          aplicarCredencialesArea(cfg.usuarios, val);
+          if (driveBtn) driveBtn.style.display = 'none';
+          if (creds)    creds.style.display    = '';
+          if (status)   status.textContent     = '✓ Configuración cargada';
+          window._loginAreaConnected = true;
         }
       } catch(e) {}
     }
-    // 2. Fallback: fetch from Vercel (used when no cache exists)
-    try {
-      const r = await fetch('/api/get-config?subArea=' + encodeURIComponent(area));
-      const d = await r.json();
-      if (d.success && d.config && d.config.usuarios) {
-        const existing = USERS.filter(u => u.area !== area);
-        const newUsers = Object.entries(d.config.usuarios).map(([grupo, u]) => ({
-          email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
-        })).filter(u => u.email && u.pw);
-        USERS.length = 0;
-        [...existing, ...newUsers].forEach(u => USERS.push(u));
-        // Cache for next time
-        if (d.config) localStorage.setItem('cissab_area_config_' + area, JSON.stringify(d.config));
-      }
-    } catch(e) { /* Vercel unavailable, no credentials loaded */ }
-  })();
-  return _preloadPromise;
+  }
 }
+
+function aplicarCredencialesArea(usuarios, area) {
+  const existing = USERS.filter(u => u.area !== area);
+  const newUsers = Object.entries(usuarios).map(([grupo, u]) => ({
+    email: (u.email||'').toLowerCase(), pw: u.pw, grupo, area, isAdmin: false
+  })).filter(u => u.email && u.pw);
+  USERS.length = 0;
+  [...existing, ...newUsers].forEach(u => USERS.push(u));
+}
+
 
 async function doLogin() {
   const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
@@ -2093,6 +2125,7 @@ function iniciarGoogleAuth() {
           }
           return;
         }
+        if (window._pendingLoginConfig) { finalizarLoginDriveConfig(); return; }
         if (driveUploadPending) { driveUploadPending = false; await ejecutarSubida(); }
       }
     });
