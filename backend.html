@@ -841,7 +841,9 @@ function renderActividades() {
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div style="width:28px;height:28px;border-radius:50%;background:${act.color};flex-shrink:0;cursor:pointer;" onclick="elegirColor(${i})" title="Cambiar color"></div>
-        <input class="field-input" value="${escBe(act.nombre)}" placeholder="Nombre del tipo..." oninput="config.tiposActividad[${i}].nombre=this.value;markUnsaved()" style="font-weight:600;"/>
+        <input class="field-input" value="${escBe(act.nombre)}" placeholder="Nombre del tipo..."
+          oninput="config.tiposActividad[${i}].nombre=this.value; config.tiposActividad[${i}].carpeta=this.value+'s'; markUnsaved()"
+          style="font-weight:600;"/>
         <button class="btn danger" onclick="eliminarActividad(${i})">×</button>
       </div>
       <div style="font-size:11px;color:var(--text-faint);">Carpeta en Drive: <b>${escBe(act.carpeta||'')}</b></div>`;
@@ -853,7 +855,7 @@ function agregarActividad() {
   config.tiposActividad.push({
     nombre: 'Nueva actividad',
     color: COLORES_ACTIVIDAD[config.tiposActividad.length % COLORES_ACTIVIDAD.length],
-    carpeta: 'Nueva actividad'
+    carpeta: 'Nueva actividades'
   });
   markUnsaved();
   renderActividades();
