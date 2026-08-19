@@ -1,25 +1,19 @@
-const { createSign } = require('crypto');
+// Upload uses moadon's OAuth refresh token (service accounts have no Drive storage quota)
+// All read/delete operations use the service account instead.
 const ROOT_FOLDER_ID = '1hiLmTa_gwzq39fmbUadm8utnhL-XiUme';
 
-async function getToken() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  if (!email || !privateKey) throw new Error('Faltan variables de entorno: GOOGLE_SERVICE_ACCOUNT_EMAIL o GOOGLE_PRIVATE_KEY');
-  const now = Math.floor(Date.now() / 1000);
-  const header  = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    iss: email, scope: 'https://www.googleapis.com/auth/drive',
-    aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
-  })).toString('base64url');
-  const sign = createSign('RSA-SHA256');
-  sign.update(`${header}.${payload}`);
-  const jwt = `${header}.${payload}.${sign.sign(privateKey, 'base64url')}`;
+async function getMoadonToken() {
   const r = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id:     process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      grant_type:    'refresh_token'
+    })
   });
   const d = await r.json();
-  if (!d.access_token) throw new Error('Token error: ' + (d.error_description || d.error || JSON.stringify(d)));
+  if (!d.access_token) throw new Error('No se pudo obtener token: ' + (d.error_description || d.error || JSON.stringify(d)));
   return d.access_token;
 }
 
@@ -32,16 +26,16 @@ module.exports = async function handler(req, res) {
 
   const { fileName, fileBase64, subArea, grupo } = req.body || {};
   if (!fileName || !fileBase64 || !subArea || !grupo)
-    return res.status(400).json({ error: 'Faltan campos: fileName, fileBase64, subArea, grupo' });
+    return res.status(400).json({ error: 'Faltan campos' });
 
   try {
-    const token = await getToken();
+    const token = await getMoadonToken();
     const auth  = `Bearer ${token}`;
 
     async function find(name, parentId) {
       const q = encodeURIComponent(`name='${name.replace(/'/g,"\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
       const d = await (await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&pageSize=1`, { headers:{Authorization:auth} })).json();
-      if (d.error) throw new Error(`Drive search error: ${d.error.message}`);
+      if (d.error) throw new Error(`Error buscando "${name}": ${d.error.message}`);
       return (d.files||[])[0]?.id || null;
     }
     async function mkdir(name, parentId) {
@@ -49,7 +43,7 @@ module.exports = async function handler(req, res) {
         method:'POST', headers:{Authorization:auth,'Content-Type':'application/json'},
         body: JSON.stringify({name, mimeType:'application/vnd.google-apps.folder', parents:[parentId]})
       })).json();
-      if (d.error) throw new Error(`Drive mkdir error for "${name}": ${d.error.message}`);
+      if (d.error) throw new Error(`Error creando "${name}": ${d.error.message}`);
       return d.id;
     }
     async function getOrMake(name, parentId) {
@@ -68,12 +62,13 @@ module.exports = async function handler(req, res) {
       pdf,
       Buffer.from(`\r\n--${boundary}--`)
     ]);
+
     const up = await (await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method:'POST', headers:{Authorization:auth, 'Content-Type':`multipart/related; boundary=${boundary}`}, body
     })).json();
 
     if (up.id) return res.status(200).json({ success: true, fileId: up.id });
-    return res.status(500).json({ error: up.error?.message || 'Upload failed', raw: JSON.stringify(up).substring(0,200) });
+    return res.status(500).json({ error: up.error?.message || 'Upload failed', raw: JSON.stringify(up).substring(0,300) });
 
   } catch(err) {
     return res.status(500).json({ error: err.message });
